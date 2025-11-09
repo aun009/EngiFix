@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -23,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +38,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,59 +110,99 @@ fun ContestScreen(
                 
                 println("📱 UI: After filtering - Today: ${todayContests.size}, Tomorrow: ${tomorrowContests.size}, Total: $totalContests")
 
+                // Simple pull-to-refresh using LazyColumn scroll state
+                val listState = rememberLazyListState()
+                val isRefreshing = uiState is ContestUiState.Loading
+                var wasScrolledDown by remember { mutableStateOf(false) }
+                
+                // Track if user was scrolled down
+                LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
+                    wasScrolledDown = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+                }
+                
+                // Detect when user scrolls back to top after being scrolled down (pull to refresh)
+                val isScrolledToTop by remember {
+                    derivedStateOf {
+                        listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                    }
+                }
+                
+                // Trigger refresh when user scrolls to top after being scrolled down
+                LaunchedEffect(isScrolledToTop) {
+                    if (isScrolledToTop && wasScrolledDown && !isRefreshing) {
+                        delay(300) // Small delay to ensure user intended to refresh
+                        if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                            viewModel.fetchContests()
+                            wasScrolledDown = false
+                        }
+                    }
+                }
+                
                 if (totalContests == 0) {
                     println("📱 UI: No contests for today/tomorrow, showing NoContestsScreen")
                     NoContestsScreen()
                 } else {
                     println("📱 UI: Showing ${todayContests.size} today + ${tomorrowContests.size} tomorrow contests")
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
-                    ) {
-                        // Today section
-                        if (todayContests.isNotEmpty()) {
-                            item {
-                                DateSectionCard(
-                                    title = "Today",
-                                    contestCount = todayContests.size,
-                                    sectionColor = Color(0xFF6C5CE7), // Purple for Today
-                                    iconColor = Color(0xFFFF6B9D), // Pink icon color
-                                    onContestClick = { contest ->
-                                        selectedContest = contest
-                                        selectedPlatform = when (contest.resource) {
-                                            "codeforces.com" -> "Codeforces"
-                                            "codechef.com" -> "CodeChef"
-                                            "atcoder.jp" -> "AtCoder"
-                                            "leetcode.com" -> "LeetCode"
-                                            else -> contest.resource
-                                        }
-                                    },
-                                    contests = todayContests
-                                )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
+                        ) {
+                            // Today section
+                            if (todayContests.isNotEmpty()) {
+                                item {
+                                    DateSectionCard(
+                                        title = "Today",
+                                        contestCount = todayContests.size,
+                                        sectionColor = Color(0xFF6C5CE7), // Purple for Today
+                                        iconColor = Color(0xFFFF6B9D), // Pink icon color
+                                        onContestClick = { contest ->
+                                            selectedContest = contest
+                                            selectedPlatform = when (contest.resource) {
+                                                "codeforces.com" -> "Codeforces"
+                                                "codechef.com" -> "CodeChef"
+                                                "atcoder.jp" -> "AtCoder"
+                                                "leetcode.com" -> "LeetCode"
+                                                else -> contest.resource
+                                            }
+                                        },
+                                        contests = todayContests
+                                    )
+                                }
+                            }
+                            
+                            // Tomorrow section
+                            if (tomorrowContests.isNotEmpty()) {
+                                item {
+                                    DateSectionCard(
+                                        title = "Tomorrow",
+                                        contestCount = tomorrowContests.size,
+                                        sectionColor = Color(0xFF4A5568), // Dark gray for Tomorrow
+                                        iconColor = Color(0xFFFF6B9D), // Pink icon color
+                                        onContestClick = { contest ->
+                                            selectedContest = contest
+                                            selectedPlatform = when (contest.resource) {
+                                                "codeforces.com" -> "Codeforces"
+                                                "codechef.com" -> "CodeChef"
+                                                "atcoder.jp" -> "AtCoder"
+                                                "leetcode.com" -> "LeetCode"
+                                                else -> contest.resource
+                                            }
+                                        },
+                                        contests = tomorrowContests
+                                    )
+                                }
                             }
                         }
                         
-                        // Tomorrow section
-                        if (tomorrowContests.isNotEmpty()) {
-                            item {
-                                DateSectionCard(
-                                    title = "Tomorrow",
-                                    contestCount = tomorrowContests.size,
-                                    sectionColor = Color(0xFF4A5568), // Dark gray for Tomorrow
-                                    iconColor = Color(0xFFFF6B9D), // Pink icon color
-                                    onContestClick = { contest ->
-                                        selectedContest = contest
-                                        selectedPlatform = when (contest.resource) {
-                                            "codeforces.com" -> "Codeforces"
-                                            "codechef.com" -> "CodeChef"
-                                            "atcoder.jp" -> "AtCoder"
-                                            "leetcode.com" -> "LeetCode"
-                                            else -> contest.resource
-                                        }
-                                    },
-                                    contests = tomorrowContests
-                                )
-                            }
+                        // Show refresh indicator at top when refreshing
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 16.dp)
+                            )
                         }
                     }
                 }

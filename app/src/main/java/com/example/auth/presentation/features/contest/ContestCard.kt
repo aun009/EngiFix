@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +29,51 @@ fun ContestCard(
     platformName: String,
     onClick: () -> Unit = {}
 ) {
+    // Check if contest is currently running and calculate remaining time
+    val isRunning = remember(contest.start, contest.end) {
+        val startCal = parseContestDate(contest.start)
+        val endCal = parseContestDate(contest.end)
+        
+        if (startCal != null && endCal != null) {
+            val now = Calendar.getInstance()
+            val startTime = startCal.time
+            val endTime = endCal.time
+            val currentTime = now.time
+            !startTime.after(currentTime) && endTime.after(currentTime)
+        } else {
+            false
+        }
+    }
+    
+    val remainingTime = remember(contest.end, isRunning) {
+        if (isRunning) {
+            val endCal = parseContestDate(contest.end)
+            if (endCal != null) {
+                val now = Calendar.getInstance()
+                val endTimeMillis = endCal.timeInMillis
+                val currentTimeMillis = now.timeInMillis
+                val diff = endTimeMillis - currentTimeMillis
+                
+                if (diff > 0) {
+                    val hours = (diff / (1000 * 60 * 60)).toInt()
+                    val minutes = ((diff % (1000 * 60 * 60)) / (1000 * 60)).toInt()
+                    
+                    when {
+                        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+                        hours > 0 -> "${hours}h"
+                        minutes > 0 -> "${minutes}m"
+                        else -> "Ending soon"
+                    }
+                } else {
+                    "Ending soon"
+                }
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -64,6 +110,24 @@ fun ContestCard(
                 )
                 
                 Spacer(modifier = Modifier.weight(1f))
+                
+                // Show "Running" badge or remaining time if contest is running
+                if (isRunning && remainingTime != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFF4CAF50) // Green for running
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "Time left: $remainingTime",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                } else {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = platformColor.copy(alpha = 0.1f)
@@ -77,6 +141,7 @@ fun ContestCard(
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
+                    }
                 }
             }
             
@@ -398,14 +463,15 @@ private fun parseContestDate(dateString: String): Calendar? {
                         val parsedMonth = tempCal.get(Calendar.MONTH) // 0-11
                         val parsedDay = tempCal.get(Calendar.DAY_OF_MONTH)
                         
-                        // Determine the year: if parsed date (with current year) is in the past, use next year
-                        tempCal.set(Calendar.YEAR, currentYear)
-                        val testDate = tempCal.time
-                        
-                        // If the test date is before now, it's next year
-                        val year = if (testDate.before(now.time)) {
+                        // Determine the year: compare only date (month/day), not time
+                        // If the parsed month/day is before today's month/day, assume next year
+                        // Otherwise, assume current year
+                        val year = if (parsedMonth < currentMonth || 
+                                      (parsedMonth == currentMonth && parsedDay < currentDay)) {
+                            // The date has already passed this year, so it must be next year
                             currentYear + 1
                         } else {
+                            // The date is today or in the future this year
                             currentYear
                         }
                         
@@ -496,39 +562,104 @@ fun filterContestsTodayAndTomorrow(contestsByPlatform: Map<String, List<ContestI
     var skipped = 0
     
     allContests.forEach { contest ->
-        val contestCal = parseContestDate(contest.start)
-        if (contestCal == null) {
+        // Special logging for AtCoder contests
+        val isAtCoder = contest.resource == "atcoder.jp"
+        
+        val contestStartCal = parseContestDate(contest.start)
+        val contestEndCal = parseContestDate(contest.end)
+        
+        if (contestStartCal == null) {
             parseErrors++
-            println("❌ Failed to parse date for: ${contest.event} - ${contest.start}")
+            println("❌ Failed to parse start date for: ${contest.event} - ${contest.start}")
+            if (isAtCoder) {
+                println("   ⚠️ ATCODER CONTEST FAILED TO PARSE!")
+            }
             return@forEach
         }
         
-        val contestYear = contestCal.get(Calendar.YEAR)
-        val contestMonth = contestCal.get(Calendar.MONTH)
-        val contestDay = contestCal.get(Calendar.DAY_OF_MONTH)
+        val startYear = contestStartCal.get(Calendar.YEAR)
+        val startMonth = contestStartCal.get(Calendar.MONTH)
+        val startDay = contestStartCal.get(Calendar.DAY_OF_MONTH)
         
-        val isToday = today.get(Calendar.YEAR) == contestYear &&
-                today.get(Calendar.MONTH) == contestMonth &&
-                today.get(Calendar.DAY_OF_MONTH) == contestDay
+        // Check if contest starts today
+        val startsToday = today.get(Calendar.YEAR) == startYear &&
+                today.get(Calendar.MONTH) == startMonth &&
+                today.get(Calendar.DAY_OF_MONTH) == startDay
         
-        val isTomorrow = tomorrow.get(Calendar.YEAR) == contestYear &&
-                tomorrow.get(Calendar.MONTH) == contestMonth &&
-                tomorrow.get(Calendar.DAY_OF_MONTH) == contestDay
+        // Check if contest starts tomorrow
+        val startsTomorrow = tomorrow.get(Calendar.YEAR) == startYear &&
+                tomorrow.get(Calendar.MONTH) == startMonth &&
+                tomorrow.get(Calendar.DAY_OF_MONTH) == startDay
         
+        // Special logging for AtCoder contests (before running check)
+        if (isAtCoder) {
+            println("🏃 ATCODER CONTEST CHECK: ${contest.event}")
+            println("   Start string: '${contest.start}' -> Parsed: ${contestStartCal.time}")
+            println("   End string: '${contest.end}' -> Parsed: ${contestEndCal?.time ?: "NULL"}")
+            println("   Starts today? $startsToday")
+        }
+        
+        // Check if contest is currently running (started before now but hasn't ended yet)
+        var isCurrentlyRunning = false
+        if (contestEndCal != null) {
+            val now = Calendar.getInstance()
+            val startTime = contestStartCal.time
+            val endTime = contestEndCal.time
+            val currentTime = now.time
+            
+            // Contest is running if: started before or at now AND ends after now
+            val started = !startTime.after(currentTime)  // startTime <= currentTime
+            val notEnded = endTime.after(currentTime)    // endTime > currentTime
+            isCurrentlyRunning = started && notEnded
+            
+            // Special logging for AtCoder contests (detailed)
+            if (isAtCoder) {
+                println("   Current time: $currentTime")
+                println("   Started? (startTime <= now): $started")
+                println("   Not ended? (endTime > now): $notEnded")
+                println("   Is running? $isCurrentlyRunning")
+            }
+            
+            // Debug logging for contests that have started
+            if (started) {
+                println("🔍 Contest started: ${contest.event}")
+                println("   Start time: ${startTime} (${contest.start})")
+                println("   Current time: ${currentTime}")
+                println("   End time: ${endTime} (${contest.end})")
+                println("   Started check: $started, Not ended check: $notEnded, Is running: $isCurrentlyRunning")
+            }
+        } else {
+            println("⚠️ No end date for: ${contest.event} - ${contest.end}")
+            if (isAtCoder) {
+                println("   ⚠️ ATCODER CONTEST HAS NO END DATE!")
+            }
+        }
+        
+        // Show contest in "Today" if:
+        // 1. It starts today, OR
+        // 2. It's currently running (regardless of when it started, as long as it's active now)
         when {
-            isToday -> {
+            startsToday || isCurrentlyRunning -> {
                 todayContests.add(contest)
                 todayMatches++
-                println("✅ TODAY: ${contest.event} - ${contest.start} -> ${contestYear}-${contestMonth+1}-${contestDay}")
+                val status = if (isCurrentlyRunning && !startsToday) "RUNNING" else if (isCurrentlyRunning && startsToday) "RUNNING (started today)" else "TODAY"
+                println("✅ $status: ${contest.event} - Start: ${contest.start}, End: ${contest.end}")
+                if (isAtCoder) {
+                    println("   🎯 ATCODER CONTEST ADDED TO TODAY!")
+                }
             }
-            isTomorrow -> {
+            startsTomorrow -> {
                 tomorrowContests.add(contest)
                 tomorrowMatches++
-                println("✅ TOMORROW: ${contest.event} - ${contest.start} -> ${contestYear}-${contestMonth+1}-${contestDay}")
+                println("✅ TOMORROW: ${contest.event} - ${contest.start} -> ${startYear}-${startMonth+1}-${startDay}")
             }
             else -> {
                 skipped++
-                println("⏭️ SKIPPED: ${contest.event} - Date: ${contestYear}-${contestMonth+1}-${contestDay}, Start: ${contest.start}")
+                println("⏭️ SKIPPED: ${contest.event} - Date: ${startYear}-${startMonth+1}-${startDay}, Start: ${contest.start}")
+                if (isAtCoder) {
+                    println("   ⚠️ ATCODER CONTEST WAS SKIPPED!")
+                    println("   Starts today? $startsToday, Is running? $isCurrentlyRunning, Starts tomorrow? $startsTomorrow")
+                }
             }
         }
     }
