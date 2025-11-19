@@ -18,25 +18,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.auth.data.Mentor
 import com.example.auth.presentation.components.MentorCardEx
 import kotlinx.coroutines.launch
 
-data class Mentor(
-    val id: String,
-    val name: String,
-    val skills: List<String>,
-    val title: String,
-    val description: String,
-    val price: String,
-    val imageUrl: String,
-    val rating: Float,
-    val totalReviews: Int
-)
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MentorshipScreen(
-    onBackClick: () -> Unit = {}
+    onBackClick: () -> Unit = {},
+    onMentorClick: (Mentor) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -59,7 +51,8 @@ fun MentorshipScreen(
                 price = "2 Tea",
                 imageUrl = "",
                 rating = 4.9f,
-                totalReviews = 127
+                totalReviews = 127,
+                "sdfdsfsdfsdf"
             ),
             Mentor(
                 id = "2",
@@ -70,7 +63,8 @@ fun MentorshipScreen(
                 price = "$65",
                 imageUrl = "",
                 rating = 4.8f,
-                totalReviews = 89
+                totalReviews = 89,
+                "sdfsdfsdfsd"
             ),
             Mentor(
                 id = "3",
@@ -81,7 +75,8 @@ fun MentorshipScreen(
                 price = "$55",
                 imageUrl = "",
                 rating = 4.7f,
-                totalReviews = 156
+                totalReviews = 156,
+                "fsjsjbfds"
             ),
             Mentor(
                 id = "4",
@@ -92,7 +87,8 @@ fun MentorshipScreen(
                 price = "$75",
                 imageUrl = "",
                 rating = 5.0f,
-                totalReviews = 203
+                totalReviews = 203,
+                "noenjre"
             ),
             Mentor(
                 id = "5",
@@ -103,7 +99,8 @@ fun MentorshipScreen(
                 price = "$45",
                 imageUrl = "",
                 rating = 4.9f,
-                totalReviews = 94
+                totalReviews = 94,
+                aboutMe = "nooennrejn"
             ),
             Mentor(
                 id = "6",
@@ -114,7 +111,8 @@ fun MentorshipScreen(
                 price = "$70",
                 imageUrl = "",
                 rating = 4.8f,
-                totalReviews = 112
+                totalReviews = 112,
+                aboutMe = "not much things"
             )
         )
     }
@@ -200,6 +198,7 @@ fun MentorshipScreen(
                             onClick = {
                                 // Handle mentor card click
                                 // Navigate to mentor detail screen
+                                onMentorClick(mentor)
                             }
                         )
                     }
