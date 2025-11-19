@@ -20,8 +20,10 @@ import com.example.auth.presentation.authentication.FirstScreen
 import com.example.auth.presentation.authentication.LoginScreen
 import com.example.auth.presentation.authentication.RegisterScreen
 import com.example.auth.presentation.authentication.UserNameAndPassScreen
+import com.example.auth.presentation.components.MentorCardEx
 import com.example.auth.presentation.features.contest.ContestScreen
 import com.example.auth.presentation.features.contest.ContestNotificationService
+import com.example.auth.presentation.features.mentorship.MentorshipScreen
 import com.example.auth.presentation.inApp.homescreen.HomeScreen
 import com.example.auth.presentation.inApp.profilescreen.ProfileScreen
 import com.example.auth.ui.theme.AuthTheme
@@ -29,6 +31,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -82,6 +85,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+
+                        composable("mentor") {
+                            MentorshipScreen (
+                                onBackClick = {
+                                    navController.navigateUp()
+                                }
+                            )
+                        }
+
+
                     }
                 }
             }

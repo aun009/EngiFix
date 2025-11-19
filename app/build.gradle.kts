@@ -46,6 +46,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/DEPENDENCIES"
+        }
+    }
 }
 
 dependencies {
@@ -66,6 +72,9 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.androidx.benchmark.common)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.volley)
+    implementation(libs.vision.internal.vkp)
+    implementation(libs.androidx.core.i18n)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -75,6 +84,10 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("com.google.dagger:hilt-android:2.57.1")
     kapt("com.google.dagger:hilt-compiler:2.57")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    // https://mvnrepository.com/artifact/io.coil-kt.coil3/coil-compose
+
 
     implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -89,5 +102,19 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-scalars:2.9.0")
 
     implementation ("com.google.android.gms:play-services-auth:20.7.0")
+
+    // OpenAI client library (without BOM - using direct version)
+    implementation("com.aallam.openai:openai-client:4.0.1")
+    
+    // Ktor client for OpenAI (OkHttp engine for Android)
+    implementation("io.ktor:ktor-client-okhttp:2.3.11")
+    
+    // Ktor core dependencies needed
+    implementation("io.ktor:ktor-client-core:2.3.11")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.11")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
+
+    // PDFBox-Android for PDF text extraction (Android-compatible, no AWT dependencies)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
 }
