@@ -1,5 +1,9 @@
 package com.example.auth.data
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+@Parcelize
 data class Mentor(
     val id: String,
     val name: String,
@@ -11,4 +15,4 @@ data class Mentor(
     val rating: Float,
     val totalReviews: Int,
     val aboutMe : String
-)
+) : Parcelable

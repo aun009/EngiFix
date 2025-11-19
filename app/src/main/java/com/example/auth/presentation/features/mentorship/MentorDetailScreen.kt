@@ -285,7 +285,7 @@ fun MentorDetailScreen(
 
                     // Get Access Button
                     Button(
-                        onClick = onGetAccessClick,
+                        onClick = {},
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50)

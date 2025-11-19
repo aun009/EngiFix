@@ -56,9 +56,9 @@ fun MentorshipScreen(
             ),
             Mentor(
                 id = "2",
-                name = "John Smith",
+                name = "Roshan Mali",
                 skills = listOf("iOS", "Swift", "SwiftUI"),
-                title = "Lead iOS Engineer at Apple",
+                title = "SWE",
                 description = "Specializing in iOS development with 10+ years of experience. Let me guide you through your iOS journey!",
                 price = "$65",
                 imageUrl = "",

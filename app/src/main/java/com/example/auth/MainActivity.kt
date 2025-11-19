@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.auth.data.Mentor
 import com.example.auth.practice.UserScreen
 import com.example.auth.presentation.authentication.AskFirstName
 import com.example.auth.presentation.authentication.AuthViewModel
@@ -23,6 +24,7 @@ import com.example.auth.presentation.authentication.UserNameAndPassScreen
 import com.example.auth.presentation.components.MentorCardEx
 import com.example.auth.presentation.features.contest.ContestScreen
 import com.example.auth.presentation.features.contest.ContestNotificationService
+import com.example.auth.presentation.features.mentorship.MentorDetailScreen
 import com.example.auth.presentation.features.mentorship.MentorshipScreen
 import com.example.auth.presentation.inApp.homescreen.HomeScreen
 import com.example.auth.presentation.inApp.profilescreen.ProfileScreen
@@ -90,9 +92,34 @@ class MainActivity : ComponentActivity() {
                             MentorshipScreen (
                                 onBackClick = {
                                     navController.navigateUp()
+                                },
+
+                                onMentorClick = {mentor ->
+                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                        "selected_mentor",
+                                        mentor
+                                    )
+
+                                    navController.navigate("mentor_detail")
                                 }
                             )
                         }
+
+                        composable("mentor_detail") {
+                            // Retrieve the mentor object
+                            val mentor = navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.get<Mentor>("selected_mentor")  // 👈 Same key used above
+
+                            // Show detail screen if mentor exists
+                            mentor?.let { selectedMentor ->
+                                MentorDetailScreen(
+                                    mentor = selectedMentor,
+                                    onBackClick = { navController.navigateUp() }
+                                )
+                            }
+                        }
+
 
 
                     }
