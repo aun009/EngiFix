@@ -17,6 +17,9 @@ class AuthViewModel @Inject constructor() : ViewModel() {
 
     private val auth: FirebaseAuth = Firebase.auth
 
+    var loginSuccess by mutableStateOf(false)
+
+
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 
     var email by mutableStateOf("")
@@ -54,17 +57,39 @@ class AuthViewModel @Inject constructor() : ViewModel() {
                         .set(user)
                         .addOnSuccessListener {
                             Log.d("AuthViewModel", "User added to Firestore")
+                            // Only report registration success; do NOT mark as logged in.
                             onResult(true, null)
                         }
-
                         .addOnFailureListener {
                             Log.e("AuthViewModel", "Firestore error", it)
                             onResult(false, null)
                         }
-
-//                    onResult(true, null)
                 } else {
                     Log.e("AuthViewModel", "Register failed", task.exception)
+                    onResult(false, task.exception?.message)
+                }
+            }
+    }
+
+    /**
+     * Send password reset email to the given address.
+     */
+    fun sendPasswordResetEmail(
+        emailForReset: String,
+        onResult: (Boolean, String?) -> Unit
+    ) {
+        if (emailForReset.isBlank()) {
+            onResult(false, "Please enter your email")
+            return
+        }
+
+        auth.sendPasswordResetEmail(emailForReset)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Log.d("AuthViewModel", "Password reset email sent to $emailForReset")
+                    onResult(true, null)
+                } else {
+                    Log.e("AuthViewModel", "Password reset failed", task.exception)
                     onResult(false, task.exception?.message)
                 }
             }
@@ -78,6 +103,7 @@ class AuthViewModel @Inject constructor() : ViewModel() {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     Log.d("AuthViewModel", "Login success: ${auth.currentUser?.uid}")
+                    loginSuccess = true
                     onResult(true, null)
                 } else {
                     Log.e("AuthViewModel", "Login failed", task.exception)

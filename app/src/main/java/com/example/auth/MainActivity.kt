@@ -1,12 +1,16 @@
 package com.example.auth
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -33,10 +37,25 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    
+    // Permission launcher for notification permission (Android 13+)
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            android.util.Log.d("MainActivity", "✅ Notification permission granted")
+        } else {
+            android.util.Log.w("MainActivity", "⚠️ Notification permission denied")
+        }
+    }
+    
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Request notification permission for Android 13+ (API 33+)
+        requestNotificationPermission()
         
         // Start the contest notification service
         startContestNotificationService()
@@ -115,7 +134,13 @@ class MainActivity : ComponentActivity() {
                             mentor?.let { selectedMentor ->
                                 MentorDetailScreen(
                                     mentor = selectedMentor,
-                                    onBackClick = { navController.navigateUp() }
+                                    onBackClick = { navController.navigateUp() },
+                                    onGetAccessClick = {
+                                        // Handle successful payment - navigate to success screen or show confirmation
+                                        // You can add navigation to a success screen here
+                                        navController.navigateUp()
+                                    },
+                                    razorpayKeyId = "YOUR_RAZORPAY_KEY_ID" // TODO: Replace with your actual Razorpay Key ID
                                 )
                             }
                         }
@@ -125,6 +150,27 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+    
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Check if permission is already granted
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    android.util.Log.d("MainActivity", "✅ Notification permission already granted")
+                }
+                else -> {
+                    // Request the permission
+                    requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        } else {
+            // For Android 12 and below, notification permission is automatically granted
+            android.util.Log.d("MainActivity", "Android version < 13, notification permission not needed")
         }
     }
     

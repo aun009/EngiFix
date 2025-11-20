@@ -18,13 +18,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +42,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.auth.presentation.components.ButtonEx
 
@@ -48,6 +52,9 @@ fun LoginScreen(navController: NavController,
                 authViewModel: AuthViewModel
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var resetError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     Box(
@@ -175,7 +182,12 @@ fun LoginScreen(navController: NavController,
                 fontSize = 14.sp,
                 modifier = Modifier.Companion
                     .padding(start = 4.dp)
-                    .clickable { /* TODO: Handle forgot password */ }
+                    .clickable {
+                        // Open dialog and pre-fill with current email if available
+                        resetEmail = authViewModel.email
+                        resetError = null
+                        showResetDialog = true
+                    }
             )
 
             Spacer(Modifier.Companion.height(32.dp))
@@ -235,6 +247,80 @@ fun LoginScreen(navController: NavController,
 
             Spacer(Modifier.Companion.weight(1f))
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Reset password") },
+            text = {
+                Column {
+                    Text(
+                        text = "Enter your account email and we'll send you a reset link.",
+                        fontSize = 14.sp,
+                        color = Color(0xFFB3B3B3)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TextField(
+                        value = resetEmail,
+                        onValueChange = { resetEmail = it },
+                        singleLine = true,
+                        placeholder = {
+                            Text("Enter your email", color = Color(0x88FFFFFF))
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            cursorColor = Color.White,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                    )
+                    if (resetError != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = resetError ?: "",
+                            color = Color(0xFFFF5252),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val email = resetEmail.trim()
+                        if (email.isBlank() || !email.contains("@")) {
+                            resetError = "Enter a valid email."
+                            return@TextButton
+                        }
+
+                        authViewModel.sendPasswordResetEmail(email) { ok, err ->
+                            if (ok) {
+                                Toast.makeText(
+                                    context,
+                                    "Password reset email sent. Check your inbox.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                showResetDialog = false
+                            } else {
+                                resetError = err ?: "Failed to send reset email."
+                            }
+                        }
+                    }
+                ) {
+                    Text("Send link")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

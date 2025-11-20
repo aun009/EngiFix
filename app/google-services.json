@@ -1,36 +1,26 @@
 {
   "project_info": {
-    "project_number": "312610679080",
-    "project_id": "auth1-c575d",
-    "storage_bucket": "auth1-c575d.firebasestorage.app"
+    "project_number": "691398463180",
+    "project_id": "engiassist-9bc6a",
+    "storage_bucket": "engiassist-9bc6a.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:312610679080:android:d0af2b9913c3b933eb881d",
+        "mobilesdk_app_id": "1:691398463180:android:6da01f2af08ff9f8f7bc69",
         "android_client_info": {
           "package_name": "com.example.auth"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "312610679080-npefae8u3eiko4sae9pi24j05hcl6j8b.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDQ-XxobkQR2JYn0vzqpk2mAX_9e_ecUkA"
+          "current_key": "AIzaSyC_a1gcPARmlmh7Gc2NIz7tKP9wchB7Cyg"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "312610679080-npefae8u3eiko4sae9pi24j05hcl6j8b.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

@@ -118,4 +118,7 @@ dependencies {
     // PDFBox-Android for PDF text extraction (Android-compatible, no AWT dependencies)
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
+    // Razorpay Payment Gateway
+    implementation("com.razorpay:checkout:1.6.40")
+
 }

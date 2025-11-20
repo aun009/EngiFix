@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class NotificationHelper(private val context: Context) {
     
@@ -54,7 +55,7 @@ class NotificationHelper(private val context: Context) {
             .setContentTitle("🚀 Contest Starting Soon!")
             .setContentText("${contest.event} on $platformName")
             .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("${contest.event} on $platformName\nStarts in 15 minutes!"))
+                .bigText("${contest.event} on $platformName\nStarts in 20 minutes!"))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
@@ -62,31 +63,77 @@ class NotificationHelper(private val context: Context) {
         
         if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
             NotificationManagerCompat.from(context).notify(contest.id, notification)
+            android.util.Log.d("NotificationHelper", "✅ Notification sent for: ${contest.event}")
+        } else {
+            android.util.Log.w("NotificationHelper", "⚠️ Notifications are disabled")
         }
     }
     
     fun checkAndNotifyUpcomingContests(contests: List<ContestItem>, platformName: String) {
         val currentTime = Calendar.getInstance()
-        val fifteenMinutesFromNow = Calendar.getInstance().apply {
-            add(Calendar.MINUTE, 15)
+        val twentyMinutesFromNow = Calendar.getInstance().apply {
+            add(Calendar.MINUTE, 20)
         }
+        
+        // Get shared preferences to track notified contests
+        val prefs = context.getSharedPreferences("contest_notifications", Context.MODE_PRIVATE)
         
         contests.forEach { contest ->
             try {
-                val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-                val contestStart = inputFormat.parse(contest.start)
+                // Try multiple date formats
+                val formats = listOf(
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()),
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()),
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()),
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
+                )
+                
+                var contestStart: Date? = null
+                for (format in formats) {
+                    try {
+                        contestStart = format.parse(contest.start)
+                        if (contestStart != null) break
+                    } catch (e: Exception) {
+                        // Try next format
+                    }
+                }
                 
                 contestStart?.let { startTime ->
                     val contestCalendar = Calendar.getInstance()
                     contestCalendar.time = startTime
                     
-                    // Check if contest starts within the next 15 minutes
-                    if (contestCalendar.after(currentTime) && contestCalendar.before(fifteenMinutesFromNow)) {
+                    // Calculate time 20 minutes before contest
+                    val notificationTime = Calendar.getInstance()
+                    notificationTime.time = startTime
+                    notificationTime.add(Calendar.MINUTE, -20)
+                    
+                    val currentTimeInMillis = currentTime.timeInMillis
+                    val notificationTimeInMillis = notificationTime.timeInMillis
+                    val twentyMinutesFromNowInMillis = twentyMinutesFromNow.timeInMillis
+                    
+                    // Check if we should notify now (within the 20-minute window)
+                    val shouldNotifyNow = notificationTimeInMillis <= currentTimeInMillis && 
+                                          currentTimeInMillis <= notificationTimeInMillis + TimeUnit.MINUTES.toMillis(5)
+                    
+                    // Check if contest starts within the next 20 minutes
+                    val contestStartsSoon = contestCalendar.after(currentTime) && 
+                                           contestCalendar.before(twentyMinutesFromNow)
+                    
+                    // Check if we've already notified for this contest
+                    val notificationKey = "notified_${contest.id}_${contest.start}"
+                    val alreadyNotified = prefs.getBoolean(notificationKey, false)
+                    
+                    if ((shouldNotifyNow || contestStartsSoon) && !alreadyNotified) {
                         showContestReminder(contest, platformName)
+                        // Mark as notified
+                        prefs.edit().putBoolean(notificationKey, true).apply()
+                        android.util.Log.d("NotificationHelper", "📢 Scheduled notification for: ${contest.event} at ${contest.start}")
                     }
+                } ?: run {
+                    android.util.Log.w("NotificationHelper", "⚠️ Could not parse date: ${contest.start}")
                 }
             } catch (e: Exception) {
-                println("Error parsing contest time for notification: ${e.message}")
+                android.util.Log.e("NotificationHelper", "❌ Error parsing contest time: ${e.message}", e)
             }
         }
     }

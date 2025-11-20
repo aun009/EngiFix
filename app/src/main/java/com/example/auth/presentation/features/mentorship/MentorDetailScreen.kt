@@ -1,5 +1,7 @@
 package com.example.auth.presentation.features.mentorship
 
+import android.app.Activity
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,8 +12,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -23,15 +30,108 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.auth.data.Mentor
+import com.example.auth.presentation.features.payment.PaymentManager
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.razorpay.PaymentData
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MentorDetailScreen(
     mentor: Mentor,
     onBackClick: () -> Unit = {},
-    onGetAccessClick: () -> Unit = {}
+    onGetAccessClick: () -> Unit = {},
+    razorpayKeyId: String = "YOUR_RAZORPAY_KEY_ID" // Pass your Razorpay key from MainActivity
 ) {
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val activity = context as? Activity
+    
+    // Get user info from Firebase (optional - will use defaults if not available)
+    var userName by remember { mutableStateOf("User") }
+    var userEmail by remember { mutableStateOf("user@example.com") }
+    var userContact by remember { mutableStateOf("+919999999999") }
+    
+    // Fetch user data from Firebase
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        try {
+            val currentUser = FirebaseAuth.getInstance().currentUser
+            if (currentUser != null) {
+                userEmail = currentUser.email ?: "user@example.com"
+                userName = currentUser.displayName ?: "User"
+                
+                // Try to get phone number from Firestore
+                val db = FirebaseFirestore.getInstance()
+                val userDoc = db.collection("users").document(currentUser.uid).get().await()
+                userContact = userDoc.getString("phoneNumber") ?: "+919999999999"
+                userName = userDoc.getString("displayName") ?: userDoc.getString("userName") ?: userName
+            }
+        } catch (e: Exception) {
+            // Use default values if Firebase fetch fails
+        }
+    }
+    
+    // Initialize PaymentManager
+    val paymentManager = remember {
+        activity?.let { PaymentManager(it, razorpayKeyId) }
+    }
+    
+    // Set up payment listener
+    paymentManager?.setPaymentListener(object : PaymentManager.PaymentListener {
+        override fun onPaymentSuccess(paymentId: String?, paymentData: PaymentData?) {
+            Toast.makeText(context, "Payment successful! Access granted.", Toast.LENGTH_LONG).show()
+            // You can navigate to a success screen or update UI here
+            onGetAccessClick()
+        }
+        
+        override fun onPaymentError(code: Int, errorMessage: String, paymentData: PaymentData?) {
+            Toast.makeText(context, "Payment failed: $errorMessage", Toast.LENGTH_LONG).show()
+        }
+    })
+    
+    // Parse price from mentor.price (handles formats like "₹1,399", "$65", "2 Tea", etc.)
+    val priceAmount = remember(mentor.price) {
+        try {
+            // Remove currency symbols and commas, extract numbers
+            val cleanedPrice = mentor.price
+                .replace("₹", "")
+                .replace("$", "")
+                .replace(",", "")
+                .replace(" ", "")
+                .filter { it.isDigit() }
+            
+            if (cleanedPrice.isNotEmpty()) {
+                cleanedPrice.toInt()
+            } else {
+                0 // Default to 0 if price is not numeric (e.g., "2 Tea")
+            }
+        } catch (e: Exception) {
+            0
+        }
+    }
+    
+    // Function to start payment
+    fun startPayment() {
+        if (priceAmount == 0) {
+            Toast.makeText(context, "This mentorship is free! Access granted.", Toast.LENGTH_SHORT).show()
+            onGetAccessClick()
+            return
+        }
+        
+        activity?.let {
+            paymentManager?.startPayment(
+                amount = priceAmount,
+                mentorName = mentor.name,
+                mentorId = mentor.id,
+                userName = userName,
+                userEmail = userEmail,
+                userContact = userContact
+            )
+        } ?: run {
+            Toast.makeText(context, "Unable to initialize payment", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFF1C1C1E)
@@ -285,7 +385,7 @@ fun MentorDetailScreen(
 
                     // Get Access Button
                     Button(
-                        onClick = {},
+                        onClick = { startPayment() },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50)
@@ -296,7 +396,7 @@ fun MentorDetailScreen(
                         )
                     ) {
                         Text(
-                            text = "Get Access!",
+                            text = if (priceAmount == 0) "Get Free Access!" else "Pay & Get Access!",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White

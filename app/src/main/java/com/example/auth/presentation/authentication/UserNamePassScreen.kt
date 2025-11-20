@@ -164,21 +164,49 @@ fun UserNameAndPassScreen(
             ButtonEx(
                 text = "Sign Up",
                 onClick = {
+                    Log.d("AuthDebug", "SignUp button clicked")
+
+                    Log.d("AuthDebug", "Username: ${authViewModel.userName}")
+                    Log.d("AuthDebug", "Password: ${authViewModel.passwordSignUp}")
+                    Log.d("AuthDebug", "Email from previous screen: ${authViewModel.email}")
+                    Log.d("AuthDebug", "Phone from previous screen: ${authViewModel.phoneNumber}")
+
+                    // Check empty fields before calling Firebase
+                    if (authViewModel.userName.isBlank()) {
+                        Log.e("AuthDebug", "Username is EMPTY")
+                        Toast.makeText(context, "Enter username", Toast.LENGTH_SHORT).show()
+                        return@ButtonEx
+                    }
+
+                    if (authViewModel.passwordSignUp.length < 6) {
+                        Log.e("AuthDebug", "Password too short: ${authViewModel.passwordSignUp.length}")
+                        Toast.makeText(context, "Password must be 6+ characters", Toast.LENGTH_SHORT).show()
+                        return@ButtonEx
+                    }
+
+                    Log.d("AuthDebug", "Calling registerUser() in ViewModel...")
+
                     authViewModel.registerUser { ok, err ->
+                        Log.d("AuthDebug", "registerUser() callback → ok=$ok err=$err")
+
                         if (ok) {
-                            // e.g., go to login or home
+                            Log.d("AuthDebug", "Signup success → navigating to login_screen")
+
                             navController.navigate("login_screen") {
-                                popUpTo("first_screen") { inclusive = false }
+                                popUpTo("first_screen") {
+                                    inclusive = false
+                                }
                             }
                         } else {
-                            // show error (Snackbar/Toast/log)
-                            Toast.makeText(context.applicationContext, err, Toast.LENGTH_LONG).show()
+                            Log.e("AuthDebug", "Signup failed inside callback")
+
+                            Toast.makeText(context, err ?: "Unknown error", Toast.LENGTH_LONG).show()
                             Log.e("RegisterScreen", "SignUp error: $err")
                         }
                     }
                 },
                 containerColor = Color(0xFF5865F2),
-                textFontWeight = FontWeight.Companion.Medium
+                textFontWeight = FontWeight.Medium
             )
 
 

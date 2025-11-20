@@ -172,7 +172,7 @@ fun RegisterScreen(
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
             )
 
-            Spacer(Modifier.height(16.dp))
+//            Spacer(Modifier.height(5.dp))
 
             // PHONE (optional)
             Text(
@@ -217,7 +217,7 @@ fun RegisterScreen(
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(17.dp))
 
             ButtonEx(
                 text = "Next",
@@ -259,16 +259,16 @@ fun RegisterScreen(
                 textFontWeight = FontWeight.Medium
             )
 
-            Spacer(Modifier.height(32.dp))
-            Text(
-                text = "Or",
-                color = Color(0xFFB3B3B3),
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(24.dp))
-            GoogleButton()
+//            Spacer(Modifier.height(32.dp))
+//            Text(
+//                text = "Or",
+//                color = Color(0xFFB3B3B3),
+//                fontSize = 14.sp,
+//                textAlign = TextAlign.Center,
+//                modifier = Modifier.fillMaxWidth()
+//            )
+//            Spacer(Modifier.height(24.dp))
+//            GoogleButton()
         }
     }
 }

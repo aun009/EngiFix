@@ -129,6 +129,10 @@ fun TopAndMidHomeScreen(navController: NavHostController) {
             TipCardEx("Mentorship ", "None") {
                 navController.navigate("mentor")
             }
+
+            TipCardEx("TimeLine", "Events") {
+                navController.navigate("timeline")
+            }
         }
     }
 }
