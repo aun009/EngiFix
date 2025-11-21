@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable("profile") {
-                            ProfileScreen(authViewModel)
+                            ProfileScreen(navController = navController,  authViewModel)
                         }
 
                         composable("ui") {

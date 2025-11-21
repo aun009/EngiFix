@@ -121,4 +121,7 @@ dependencies {
     // Razorpay Payment Gateway
     implementation("com.razorpay:checkout:1.6.40")
 
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
+
 }

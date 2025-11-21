@@ -1,5 +1,6 @@
 package com.example.auth.presentation.inApp.profilescreen
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,10 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
+import com.example.auth.data.repository.CodingPlatformStatsRepository
 import com.example.auth.presentation.authentication.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -30,11 +37,13 @@ import kotlinx.coroutines.tasks.await
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    navController: NavController? = null,
     viewModel: AuthViewModel = hiltViewModel(),
     onNavigateToLogin: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val statsRepository = remember { CodingPlatformStatsRepository() }
 
     // User data state
     var userName by remember { mutableStateOf("") }
@@ -67,15 +76,62 @@ fun ProfileScreen(
                     // Load coding platforms if they exist
                     val platformsData = document.get("codingPlatforms") as? List<Map<String, String>>
                     platformsData?.forEach { platformMap ->
+                        val platformName = platformMap["name"] ?: ""
+                        val username = platformMap["username"] ?: ""
+                        val existingStats = platformMap["stats"] ?: "N/A"
+                        val existingLabel = platformMap["statsLabel"] ?: ""
+                        
+                        val existingImageUrl = platformMap["profileImageUrl"]?.takeIf { it.isNotEmpty() }
+                        
+                        // Add platform first with existing or loading state
                         platforms.add(
                             CodingPlatform(
-                                name = platformMap["name"] ?: "",
-                                username = platformMap["username"] ?: "",
-                                stats = platformMap["stats"] ?: "N/A",
-                                statsLabel = platformMap["statsLabel"] ?: "",
-                                icon = Icons.Default.Star
+                                name = platformName,
+                                username = username,
+                                stats = if (existingStats == "N/A") "N/A" else existingStats,
+                                statsLabel = if (existingLabel == "Loading..." || existingStats == "N/A") "Loading..." else existingLabel,
+                                icon = Icons.Default.Star,
+                                profileImageUrl = existingImageUrl
                             )
                         )
+                        
+                        // Fetch real stats in background if stats are N/A or Loading
+                        if (existingStats == "N/A" || existingLabel == "Loading...") {
+                            scope.launch {
+                                try {
+                                    val platformStats = statsRepository.fetchStats(platformName, username)
+                                    // Update the platform in the list
+                                    val index = platforms.indexOfFirst { 
+                                        it.name == platformName && it.username == username 
+                                    }
+                                    if (index >= 0) {
+                                        platforms[index] = platforms[index].copy(
+                                            stats = platformStats.rating,
+                                            statsLabel = platformStats.statsLabel,
+                                            profileImageUrl = platformStats.profileImageUrl
+                                        )
+                                        
+                                        // Update Firestore with fetched stats
+                                        val db = FirebaseFirestore.getInstance()
+                                        val platformsList = platforms.map {
+                                            mapOf(
+                                                "name" to it.name,
+                                                "username" to it.username,
+                                                "stats" to it.stats,
+                                                "statsLabel" to it.statsLabel,
+                                                "profileImageUrl" to (it.profileImageUrl ?: "")
+                                            )
+                                        }
+                                        db.collection("users")
+                                            .document(currentUser.uid)
+                                            .update("codingPlatforms", platformsList)
+                                            .await()
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("ProfileScreen", "Error fetching stats: ${e.message}")
+                                }
+                            }
+                        }
                     }
                 } else {
                     userNotFound = true
@@ -100,6 +156,17 @@ fun ProfileScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
+                },
+                navigationIcon = {
+                    if (navController != null) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
@@ -183,20 +250,31 @@ fun ProfileScreen(
                     // Coding Platforms Section
                     CodingPlatformsSection(
                         platforms = platforms,
+                        statsRepository = statsRepository,
                         onPlatformAdded = { platformName, username ->
                             scope.launch {
-                                // Add to local list
-                                platforms.add(
-                                    CodingPlatform(
-                                        platformName,
-                                        username,
-                                        "N/A",
-                                        "Loading...",
-                                        Icons.Default.Star
-                                    )
+                                // Check if platform already exists (safety check)
+                                val alreadyExists = platforms.any { 
+                                    it.name.equals(platformName, ignoreCase = true) 
+                                }
+                                
+                                if (alreadyExists) {
+                                    android.util.Log.w("ProfileScreen", "Platform $platformName already exists, skipping add")
+                                    return@launch
+                                }
+                                
+                                // Add to local list with loading state
+                                val newPlatform = CodingPlatform(
+                                    platformName,
+                                    username,
+                                    "N/A",
+                                    "Loading...",
+                                    Icons.Default.Star,
+                                    null
                                 )
+                                platforms.add(newPlatform)
 
-                                // Save to Firestore
+                                // Save to Firestore first with loading state
                                 val currentUser = FirebaseAuth.getInstance().currentUser
                                 if (currentUser != null) {
                                     val db = FirebaseFirestore.getInstance()
@@ -205,12 +283,58 @@ fun ProfileScreen(
                                             "name" to it.name,
                                             "username" to it.username,
                                             "stats" to it.stats,
-                                            "statsLabel" to it.statsLabel
+                                            "statsLabel" to it.statsLabel,
+                                            "profileImageUrl" to (it.profileImageUrl ?: "")
                                         )
                                     }
                                     db.collection("users")
                                         .document(currentUser.uid)
                                         .update("codingPlatforms", platformsList)
+                                        .await()
+                                    
+                                    // Now fetch real stats
+                                    try {
+                                        val platformStats = statsRepository.fetchStats(platformName, username)
+                                        
+                                        // Update the platform in the list
+                                        val index = platforms.indexOfFirst { 
+                                            it.name == platformName && it.username == username 
+                                        }
+                                        if (index >= 0) {
+                                            platforms[index] = platforms[index].copy(
+                                                stats = platformStats.rating,
+                                                statsLabel = platformStats.statsLabel,
+                                                profileImageUrl = platformStats.profileImageUrl
+                                            )
+                                            
+                                            // Update Firestore with fetched stats
+                                            val updatedPlatformsList = platforms.map {
+                                                mapOf(
+                                                    "name" to it.name,
+                                                    "username" to it.username,
+                                                    "stats" to it.stats,
+                                                    "statsLabel" to it.statsLabel,
+                                                    "profileImageUrl" to (it.profileImageUrl ?: "")
+                                                )
+                                            }
+                                            db.collection("users")
+                                                .document(currentUser.uid)
+                                                .update("codingPlatforms", updatedPlatformsList)
+                                                .await()
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("ProfileScreen", "Error fetching stats for new platform: ${e.message}")
+                                        // Update to show error state
+                                        val index = platforms.indexOfFirst { 
+                                            it.name == platformName && it.username == username 
+                                        }
+                                        if (index >= 0) {
+                                            platforms[index] = platforms[index].copy(
+                                                stats = "Error",
+                                                statsLabel = "Failed to load"
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -227,12 +351,70 @@ fun ProfileScreen(
                                             "name" to it.name,
                                             "username" to it.username,
                                             "stats" to it.stats,
-                                            "statsLabel" to it.statsLabel
+                                            "statsLabel" to it.statsLabel,
+                                            "profileImageUrl" to (it.profileImageUrl ?: "")
                                         )
                                     }
                                     db.collection("users")
                                         .document(currentUser.uid)
                                         .update("codingPlatforms", platformsList)
+                                        .await()
+                                }
+                            }
+                        },
+                        onPlatformRefresh = { platform ->
+                            scope.launch {
+                                try {
+                                    // Update to loading state
+                                    val index = platforms.indexOfFirst { 
+                                        it.name == platform.name && it.username == platform.username 
+                                    }
+                                    if (index >= 0) {
+                                        platforms[index] = platforms[index].copy(
+                                            stats = "N/A",
+                                            statsLabel = "Loading..."
+                                        )
+                                        
+                                        // Fetch fresh stats
+                                        val platformStats = statsRepository.fetchStats(platform.name, platform.username)
+                                        
+                                        // Update with fetched stats
+                                        platforms[index] = platforms[index].copy(
+                                            stats = platformStats.rating,
+                                            statsLabel = platformStats.statsLabel,
+                                            profileImageUrl = platformStats.profileImageUrl
+                                        )
+                                        
+                                        // Update Firestore
+                                        val currentUser = FirebaseAuth.getInstance().currentUser
+                                        if (currentUser != null) {
+                                            val db = FirebaseFirestore.getInstance()
+                                            val platformsList = platforms.map {
+                                                mapOf(
+                                                    "name" to it.name,
+                                                    "username" to it.username,
+                                                    "stats" to it.stats,
+                                                    "statsLabel" to it.statsLabel,
+                                                    "profileImageUrl" to (it.profileImageUrl ?: "")
+                                                )
+                                            }
+                                            db.collection("users")
+                                                .document(currentUser.uid)
+                                                .update("codingPlatforms", platformsList)
+                                                .await()
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("ProfileScreen", "Error refreshing stats: ${e.message}")
+                                    val index = platforms.indexOfFirst { 
+                                        it.name == platform.name && it.username == platform.username 
+                                    }
+                                    if (index >= 0) {
+                                        platforms[index] = platforms[index].copy(
+                                            stats = "Error",
+                                            statsLabel = "Failed to load"
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -417,8 +599,10 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun CodingPlatformsSection(
     platforms: List<CodingPlatform>,
+    statsRepository: CodingPlatformStatsRepository,
     onPlatformAdded: (String, String) -> Unit,
-    onPlatformRemoved: (CodingPlatform) -> Unit
+    onPlatformRemoved: (CodingPlatform) -> Unit,
+    onPlatformRefresh: (CodingPlatform) -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -457,7 +641,8 @@ private fun CodingPlatformsSection(
             platforms.forEach { platform ->
                 PlatformCard(
                     platform = platform,
-                    onRemove = { onPlatformRemoved(platform) }
+                    onRemove = { onPlatformRemoved(platform) },
+                    onRefresh = { onPlatformRefresh(platform) }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -466,6 +651,7 @@ private fun CodingPlatformsSection(
 
     if (showAddDialog) {
         AddPlatformDialog(
+            existingPlatforms = platforms,
             onDismiss = { showAddDialog = false },
             onAdd = { platformName, username ->
                 onPlatformAdded(platformName, username)
@@ -478,7 +664,8 @@ private fun CodingPlatformsSection(
 @Composable
 private fun PlatformCard(
     platform: CodingPlatform,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    onRefresh: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -496,7 +683,7 @@ private fun PlatformCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Platform Icon
+            // Platform Icon or Profile Image
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -514,12 +701,52 @@ private fun PlatformCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = platform.name.first().toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                if (platform.profileImageUrl != null && platform.profileImageUrl.isNotEmpty()) {
+                    val imagePainter = rememberAsyncImagePainter(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(platform.profileImageUrl)
+                            .crossfade(true)
+                            .build()
+                    )
+                    
+                    val imageState = imagePainter.state
+                    
+                    when {
+                        imageState is coil.compose.AsyncImagePainter.State.Success -> {
+                            // Image loaded successfully
+                            Image(
+                                painter = imagePainter,
+                                contentDescription = "${platform.name} profile",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        imageState is coil.compose.AsyncImagePainter.State.Error -> {
+                            // Error loading image - fallback to platform icon
+                            Text(
+                                text = platform.name.first().toString(),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        else -> {
+                            // Loading state
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    }
+                } else {
+                    // Fallback to platform icon if no image URL
+                    Text(
+                        text = platform.name.first().toString(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -569,7 +796,10 @@ private fun PlatformCard(
                     )
                     DropdownMenuItem(
                         text = { Text("Refresh") },
-                        onClick = { showMenu = false },
+                        onClick = {
+                            showMenu = false
+                            onRefresh()
+                        },
                         leadingIcon = { Icon(Icons.Default.Refresh, null) }
                     )
                     DropdownMenuItem(
@@ -642,14 +872,21 @@ private fun EmptyPlatformsCard(onAddClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddPlatformDialog(
+    existingPlatforms: List<CodingPlatform>,
     onDismiss: () -> Unit,
     onAdd: (String, String) -> Unit
 ) {
     var selectedPlatform by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val platforms = listOf("GitHub", "LeetCode", "Codeforces", "CodeChef", "HackerRank", "AtCoder")
+    val allPlatforms = listOf("GitHub", "LeetCode", "Codeforces", "CodeChef", "HackerRank", "AtCoder")
+    
+    // Filter out already added platforms
+    val availablePlatforms = allPlatforms.filter { platformName ->
+        !existingPlatforms.any { it.name.equals(platformName, ignoreCase = true) }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -670,14 +907,23 @@ private fun AddPlatformDialog(
                     )
 
                     ExposedDropdownMenu(expanded, { expanded = false }) {
-                        platforms.forEach { platform ->
+                        if (availablePlatforms.isEmpty()) {
                             DropdownMenuItem(
-                                text = { Text(platform) },
-                                onClick = {
-                                    selectedPlatform = platform
-                                    expanded = false
-                                }
+                                text = { Text("All platforms added", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = { expanded = false },
+                                enabled = false
                             )
+                        } else {
+                            availablePlatforms.forEach { platform ->
+                                DropdownMenuItem(
+                                    text = { Text(platform) },
+                                    onClick = {
+                                        selectedPlatform = platform
+                                        expanded = false
+                                        errorMessage = null // Clear error when platform changes
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -686,19 +932,48 @@ private fun AddPlatformDialog(
 
                 OutlinedTextField(
                     value = username,
-                    onValueChange = { username = it },
+                    onValueChange = { 
+                        username = it
+                        errorMessage = null // Clear error when username changes
+                    },
                     label = { Text("Username") },
                     placeholder = { Text("Enter your username") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Person, null) }
+                    leadingIcon = { Icon(Icons.Default.Person, null) },
+                    isError = errorMessage != null
                 )
+                
+                // Show error message if duplicate
+                if (errorMessage != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(selectedPlatform, username) },
-                enabled = selectedPlatform.isNotEmpty() && username.isNotEmpty()
+                onClick = {
+                    // Check for duplicate (double-check even though dropdown filters)
+                    val isDuplicate = existingPlatforms.any { 
+                        it.name.equals(selectedPlatform, ignoreCase = true) 
+                    }
+                    
+                    if (isDuplicate) {
+                        errorMessage = "This platform is already added"
+                    } else if (selectedPlatform.isNotEmpty() && username.isNotEmpty()) {
+                        errorMessage = null
+                        onAdd(selectedPlatform, username.trim())
+                    } else {
+                        errorMessage = "Please fill all fields"
+                    }
+                },
+                enabled = selectedPlatform.isNotEmpty() && username.isNotEmpty() && availablePlatforms.isNotEmpty()
             ) {
                 Text("Add")
             }
@@ -824,5 +1099,6 @@ data class CodingPlatform(
     val username: String,
     val stats: String,
     val statsLabel: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val profileImageUrl: String? = null
 )

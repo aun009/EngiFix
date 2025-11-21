@@ -64,4 +64,3 @@ If you still get errors:
 1. Wait 5-10 minutes for Firebase to propagate changes
 2. Make sure you're using the correct Firebase project
 3. Verify the package name matches: `com.example.auth`
-
