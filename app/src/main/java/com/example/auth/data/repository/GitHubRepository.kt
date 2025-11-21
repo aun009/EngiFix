@@ -36,7 +36,8 @@ class GitHubRepository {
             val publicRepos = json.optInt("public_repos", 0)
             val followers = json.optInt("followers", 0)
             val following = json.optInt("following", 0)
-            val avatarUrl = json.optString("avatar_url", null)
+            // Use GitHub's direct avatar URL which always works for public profiles
+            val avatarUrl = "https://github.com/$username.png"
             
             // GitHub doesn't have a "rating" system, so we use repos as the main stat
             return@withContext PlatformStats(

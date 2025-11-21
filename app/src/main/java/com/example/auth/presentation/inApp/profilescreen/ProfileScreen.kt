@@ -1,6 +1,5 @@
 package com.example.auth.presentation.inApp.profilescreen
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,14 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import coil.compose.rememberAsyncImagePainter
-import coil.request.ImageRequest
+import coil.compose.AsyncImage
 import com.example.auth.data.repository.CodingPlatformStatsRepository
 import com.example.auth.presentation.authentication.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -702,42 +699,13 @@ private fun PlatformCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (platform.profileImageUrl != null && platform.profileImageUrl.isNotEmpty()) {
-                    val imagePainter = rememberAsyncImagePainter(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(platform.profileImageUrl)
-                            .crossfade(true)
-                            .build()
+                    AsyncImage(
+                        model = platform.profileImageUrl,
+                        contentDescription = "${platform.name} profile",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
                     )
-                    
-                    val imageState = imagePainter.state
-                    
-                    when {
-                        imageState is coil.compose.AsyncImagePainter.State.Success -> {
-                            // Image loaded successfully
-                            Image(
-                                painter = imagePainter,
-                                contentDescription = "${platform.name} profile",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        imageState is coil.compose.AsyncImagePainter.State.Error -> {
-                            // Error loading image - fallback to platform icon
-                            Text(
-                                text = platform.name.first().toString(),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        else -> {
-                            // Loading state
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        }
-                    }
                 } else {
                     // Fallback to platform icon if no image URL
                     Text(
