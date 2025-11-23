@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -258,6 +259,8 @@ fun ProfileScreen(
                                 if (alreadyExists) {
                                     android.util.Log.w("ProfileScreen", "Platform $platformName already exists, skipping add")
                                     return@launch
+
+
                                 }
                                 
                                 // Add to local list with loading state
@@ -594,6 +597,21 @@ private fun InfoRow(label: String, value: String) {
 }
 
 @Composable
+private fun Education(
+    education: String,
+    onCollageAdded : () -> Unit,
+    onCollageRemoved : () -> Unit,
+    onLinkedInAdded : () -> Unit,
+    onLinkedInRemoved : () -> Unit,
+
+    // also want here twitter
+) {
+    Column(
+
+    ) { }
+}
+
+@Composable
 private fun CodingPlatformsSection(
     platforms: List<CodingPlatform>,
     statsRepository: CodingPlatformStatsRepository,
@@ -635,6 +653,9 @@ private fun CodingPlatformsSection(
         if (platforms.isEmpty()) {
             EmptyPlatformsCard(onAddClick = { showAddDialog = true })
         } else {
+
+
+
             platforms.forEach { platform ->
                 PlatformCard(
                     platform = platform,
