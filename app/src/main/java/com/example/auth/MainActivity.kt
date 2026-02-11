@@ -30,6 +30,7 @@ import com.example.auth.presentation.features.contest.ContestScreen
 import com.example.auth.presentation.features.contest.ContestNotificationService
 import com.example.auth.presentation.features.mentorship.MentorDetailScreen
 import com.example.auth.presentation.features.mentorship.MentorshipScreen
+import com.example.auth.presentation.features.sheet.ExploreSheetScreen
 import com.example.auth.presentation.inApp.homescreen.HomeScreen
 import com.example.auth.presentation.inApp.profilescreen.ProfileScreen
 import com.example.auth.ui.theme.AuthTheme
@@ -124,6 +125,14 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        composable("sheets") {
+                            ExploreSheetScreen(
+                                onBackClick = {
+                                    navController.navigateUp();
+                                }
+                            )
+                        }
+
                         composable("mentor_detail") {
                             // Retrieve the mentor object
                             val mentor = navController.previousBackStackEntry
@@ -144,9 +153,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
-
-
-
                     }
                 }
             }

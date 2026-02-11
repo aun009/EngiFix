@@ -130,8 +130,12 @@ fun TopAndMidHomeScreen(navController: NavHostController) {
                 navController.navigate("mentor")
             }
 
-            TipCardEx("TimeLine", "Events") {
-                navController.navigate("timeline")
+//            TipCardEx("TimeLine", "Events") {
+//                navController.navigate("timeline")
+//            }
+
+            TipCardEx("Explore Sheets", "DSA Sheets") {
+                navController.navigate("sheets")
             }
         }
     }

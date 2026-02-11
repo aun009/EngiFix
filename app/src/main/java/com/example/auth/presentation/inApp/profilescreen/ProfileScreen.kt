@@ -4,6 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
@@ -19,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.modifier.modifierLocalConsumer
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -686,6 +696,7 @@ private fun PlatformCard(
     onRefresh: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -780,7 +791,13 @@ private fun PlatformCard(
                 ) {
                     DropdownMenuItem(
                         text = { Text("View Profile") },
-                        onClick = { showMenu = false },
+                        onClick = { 
+                            showMenu = false
+                            val url = getProfileUrl(platform.name, platform.username)
+                            if (url.isNotEmpty()) {
+                                uriHandler.openUri(url)
+                            }
+                        },
                         leadingIcon = { Icon(Icons.Default.ExitToApp, null) }
                     )
                     DropdownMenuItem(
@@ -1091,3 +1108,15 @@ data class CodingPlatform(
     val icon: ImageVector,
     val profileImageUrl: String? = null
 )
+
+private fun getProfileUrl(platform: String, username: String): String {
+    return when (platform.lowercase()) {
+        "leetcode" -> "https://leetcode.com/u/$username/"
+        "codeforces" -> "https://codeforces.com/profile/$username"
+        "codechef" -> "https://www.codechef.com/users/$username"
+        "hackerrank" -> "https://www.hackerrank.com/profile/$username"
+        "atcoder" -> "https://atcoder.jp/users/$username"
+        "github" -> "https://github.com/$username"
+        else -> ""
+    }
+}

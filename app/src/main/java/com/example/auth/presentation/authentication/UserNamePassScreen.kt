@@ -95,7 +95,7 @@ fun UserNameAndPassScreen(
 
             // Email input
             Text(
-                text = "Username",
+                text = "Email",
                 color = Color(0xFFD7D7D7),
                 fontSize = 14.sp,
                 modifier = Modifier.Companion.padding(start = 4.dp, bottom = 4.dp)
@@ -104,7 +104,7 @@ fun UserNameAndPassScreen(
             TextField(
                 value = authViewModel.userName,
                 onValueChange = { authViewModel.userName = it },
-                placeholder = { Text("username", color = Color(0x88FFFFFF)) },
+                placeholder = { Text("Enter your email", color = Color(0x88FFFFFF)) },
                 colors = textFieldColors(),
                 singleLine = true,
                 modifier = Modifier.Companion
