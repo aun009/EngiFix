@@ -1,8 +1,10 @@
 package com.example.auth.presentation.features.contest
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +28,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dagger.hilt.android.EntryPointAccessors
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +55,7 @@ fun ContestScreen(
     val context = LocalContext.current
     var selectedContest by remember { mutableStateOf<ContestItem?>(null) }
     var selectedPlatform by remember { mutableStateOf<String>("") }
+    var selectedTabIndex by remember { mutableStateOf(0) }
     
     val viewModel = remember {
         val appContext = context.applicationContext
@@ -60,15 +68,27 @@ fun ContestScreen(
     }
     val uiState by viewModel.uiState.collectAsState()
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1C1C1E))
+    ) {
         // Top App Bar with back button and refresh
         TopAppBar(
-            title = { Text("Contests", style = MaterialTheme.typography.headlineSmall) },
+            title = {
+                Text(
+                    "Contests",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = Color.White
+                )
+            },
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back"
+                        contentDescription = "Back",
+                        tint = Color.White
                     )
                 }
             },
@@ -76,39 +96,35 @@ fun ContestScreen(
                 IconButton(onClick = { viewModel.fetchContests() }) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh"
+                        contentDescription = "Refresh",
+                        tint = Color.White
                     )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.onSurface
+                containerColor = Color(0xFF1C1C1E),
+                titleContentColor = Color.White
             )
         )
 
         when (uiState) {
             is ContestUiState.Loading -> {
                 Box(
-                    Modifier.fillMaxSize(),
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF1C1C1E)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = Color(0xFF6C5CE7))
                 }
             }
 
             is ContestUiState.Success -> {
-                val contestsByPlatform = (uiState as ContestUiState.Success).contestsByPlatform
-                
-                println("📱 UI: Received ${contestsByPlatform.values.sumOf { it.size }} total contests from ${contestsByPlatform.size} platforms")
-                contestsByPlatform.forEach { (platform, contests) ->
-                    println("   Platform: $platform - ${contests.size} contests")
-                }
-
-                // Filter contests for today and tomorrow only
-                val (todayContests, tomorrowContests) = filterContestsTodayAndTomorrow(contestsByPlatform)
+                val todayContests = (uiState as ContestUiState.Success).todayContests
+                val tomorrowContests = (uiState as ContestUiState.Success).tomorrowContests
                 val totalContests = todayContests.size + tomorrowContests.size
                 
-                println("📱 UI: After filtering - Today: ${todayContests.size}, Tomorrow: ${tomorrowContests.size}, Total: $totalContests")
+                println("📱 UI: Showing Today: ${todayContests.size}, Tomorrow: ${tomorrowContests.size}, Total: $totalContests")
 
                 // Simple pull-to-refresh using LazyColumn scroll state
                 val listState = rememberLazyListState()
@@ -143,55 +159,75 @@ fun ContestScreen(
                     NoContestsScreen()
                 } else {
                     println("📱 UI: Showing ${todayContests.size} today + ${tomorrowContests.size} tomorrow contests")
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
-                        ) {
-                            // Today section
-                            if (todayContests.isNotEmpty()) {
-                                item {
-                                    DateSectionCard(
-                                        title = "Today",
-                                        contestCount = todayContests.size,
-                                        sectionColor = Color(0xFF6C5CE7), // Purple for Today
-                                        iconColor = Color(0xFFFF6B9D), // Pink icon color
-                                        onContestClick = { contest ->
-                                            selectedContest = contest
-                                            selectedPlatform = when (contest.resource) {
-                                                "codeforces.com" -> "Codeforces"
-                                                "codechef.com" -> "CodeChef"
-                                                "atcoder.jp" -> "AtCoder"
-                                                "leetcode.com" -> "LeetCode"
-                                                else -> contest.resource
-                                            }
-                                        },
-                                        contests = todayContests
+                    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
+                        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
+                            TabRow(
+                                selectedTabIndex = selectedTabIndex,
+                                containerColor = Color(0xFF1C1C1E),
+                                contentColor = Color(0xFF6C5CE7),
+                                indicator = { tabPositions ->
+                                    TabRowDefaults.Indicator(
+                                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                        color = Color(0xFF6C5CE7)
                                     )
                                 }
+                            ) {
+                                Tab(
+                                    selected = selectedTabIndex == 0,
+                                    onClick = { selectedTabIndex = 0 },
+                                    text = {
+                                        Text(
+                                            "Today (${todayContests.size})",
+                                            color = if (selectedTabIndex == 0) Color(0xFF6C5CE7) else Color(0xFF888888)
+                                        )
+                                    }
+                                )
+                                Tab(
+                                    selected = selectedTabIndex == 1,
+                                    onClick = { selectedTabIndex = 1 },
+                                    text = {
+                                        Text(
+                                            "Tomorrow (${tomorrowContests.size})",
+                                            color = if (selectedTabIndex == 1) Color(0xFF6C5CE7) else Color(0xFF888888)
+                                        )
+                                    }
+                                )
                             }
                             
-                            // Tomorrow section
-                            if (tomorrowContests.isNotEmpty()) {
-                                item {
-                                    DateSectionCard(
-                                        title = "Tomorrow",
-                                        contestCount = tomorrowContests.size,
-                                        sectionColor = Color(0xFF4A5568), // Dark gray for Tomorrow
-                                        iconColor = Color(0xFFFF6B9D), // Pink icon color
-                                        onContestClick = { contest ->
-                                            selectedContest = contest
-                                            selectedPlatform = when (contest.resource) {
-                                                "codeforces.com" -> "Codeforces"
-                                                "codechef.com" -> "CodeChef"
-                                                "atcoder.jp" -> "AtCoder"
-                                                "leetcode.com" -> "LeetCode"
-                                                else -> contest.resource
-                                            }
-                                        },
-                                        contests = tomorrowContests
-                                    )
+                            val activeContests = if (selectedTabIndex == 0) todayContests else tomorrowContests
+                            
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(top = 8.dp, bottom = 8.dp)
+                            ) {
+                                if (activeContests.isNotEmpty()) {
+                                    item {
+                                        DateSectionCard(
+                                            title = if (selectedTabIndex == 0) "Today's Contests" else "Tomorrow's Contests",
+                                            contestCount = activeContests.size,
+                                            sectionColor = if (selectedTabIndex == 0) Color(0xFF6C5CE7) else Color(0xFF4A5568),
+                                            iconColor = Color(0xFFFF6B9D),
+                                            onContestClick = { uiModel ->
+                                                selectedContest = uiModel.raw
+                                                selectedPlatform = uiModel.platformName
+                                            },
+                                            contests = activeContests
+                                        )
+                                    }
+                                } else {
+                                    item {
+                                        Box(
+                                            modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "No contests scheduled.",
+                                                color = Color.Gray,
+                                                style = MaterialTheme.typography.bodyLarge
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -212,7 +248,9 @@ fun ContestScreen(
                 val msg = (uiState as ContestUiState.Error).message
                 println("❌ ERROR STATE: $msg")
                 Box(
-                    Modifier.fillMaxSize(),
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF1C1C1E)),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -220,16 +258,25 @@ fun ContestScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            "Error: $msg", 
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.titleLarge
+                            "Something went wrong",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Check Logcat for details. Search for: 'Contest' or 'Filtering'",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            msg,
+                            color = Color(0xFFAAAAAA),
                             style = MaterialTheme.typography.bodyMedium
                         )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { viewModel.fetchContests() },
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF6C5CE7)),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Retry", color = Color(0xFF6C5CE7))
+                        }
                     }
                 }
             }

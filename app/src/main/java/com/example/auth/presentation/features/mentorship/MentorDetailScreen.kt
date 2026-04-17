@@ -35,6 +35,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.razorpay.PaymentData
 import kotlinx.coroutines.tasks.await
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,15 +95,15 @@ fun MentorDetailScreen(
     val priceAmount = remember(mentor.price) {
         try {
             // Remove currency symbols and commas, extract numbers
-            val cleanedPrice = mentor.price
+            val basePrice = mentor.price
                 .replace("₹", "")
                 .replace("$", "")
                 .replace(",", "")
                 .replace(" ", "")
                 .filter { it.isDigit() }
             
-            if (cleanedPrice.isNotEmpty()) {
-                cleanedPrice.toInt()
+            if (basePrice.isNotEmpty()) {
+                basePrice.toInt()
             } else {
                 0 // Default to 0 if price is not numeric (e.g., "2 Tea")
             }
@@ -110,10 +111,21 @@ fun MentorDetailScreen(
             0
         }
     }
-    
-    // Function to start payment
+
+    var selectedOfferingIndex by remember { mutableStateOf(0) }
+    val offerings = listOf(
+        Pair("1:1 Guidance", 1.0f),
+        Pair("Resume Review", 0.5f),
+        Pair("Mock Interview", 1.5f)
+    )
+
+    val currentPriceAmount = (priceAmount * offerings[selectedOfferingIndex].second).toInt()
+
+    var showConfirmationDialog by remember { mutableStateOf(false) }
+
+    // Function to actually start payment
     fun startPayment() {
-        if (priceAmount == 0) {
+        if (currentPriceAmount == 0) {
             Toast.makeText(context, "This mentorship is free! Access granted.", Toast.LENGTH_SHORT).show()
             onGetAccessClick()
             return
@@ -121,7 +133,7 @@ fun MentorDetailScreen(
         
         activity?.let {
             paymentManager?.startPayment(
-                amount = priceAmount,
+                amount = currentPriceAmount,
                 mentorName = mentor.name,
                 mentorId = mentor.id,
                 userName = userName,
@@ -130,6 +142,15 @@ fun MentorDetailScreen(
             )
         } ?: run {
             Toast.makeText(context, "Unable to initialize payment", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Wrap payment request to show confirmation step
+    fun requestPayment() {
+        if (currentPriceAmount == 0) {
+            startPayment()
+        } else {
+            showConfirmationDialog = true
         }
     }
 
@@ -142,6 +163,38 @@ fun MentorDetailScreen(
                 .background(Color(0xFF1C1C1E))
                 .padding(paddingValues)
         ) {
+            if (showConfirmationDialog) {
+                AlertDialog(
+                    onDismissRequest = { showConfirmationDialog = false },
+                    title = { Text(text = "Confirm Booking Details", fontWeight = FontWeight.Bold, color = Color.White) },
+                    text = {
+                        Column {
+                            Text("You are about to book:", color = Color(0xFFCCCCCC))
+                            Spacer(Modifier.height(8.dp))
+                            Text("Mentor: ${mentor.name}", fontWeight = FontWeight.Medium, color = Color.White)
+                            Text("Service: ${offerings[selectedOfferingIndex].first}", fontWeight = FontWeight.Medium, color = Color.White)
+                            Spacer(Modifier.height(8.dp))
+                            Text("The total cost will be ₹$currentPriceAmount.", color = Color(0xFFFFB74D), fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text("By confirming, you will be directed securely to Razorpay.", color = Color(0xFFAAAAAA), fontSize = 12.sp)
+                        }
+                    },
+                    containerColor = Color(0xFF2C2C2E),
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showConfirmationDialog = false
+                            startPayment()
+                        }) {
+                            Text("Proceed to Payment", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showConfirmationDialog = false }) {
+                            Text("Cancel", color = Color(0xFFAAAAAA))
+                        }
+                    }
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -177,21 +230,22 @@ fun MentorDetailScreen(
                             )
                         }
 
-                        // Best Deal Badge
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFB24592).copy(alpha = 0.3f)
-                        ) {
-                            Text(
-                                text = "Best Deal",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFFF6EC7),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
+                        // Best Deal Badge — only for highly rated mentors
+                        if (mentor.rating >= 4.8f) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFFB24592).copy(alpha = 0.3f)
+                            ) {
+                                Text(
+                                    text = "⭐ Best Deal",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFFFF6EC7),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(16.dp))
                         }
-
-                        Spacer(Modifier.height(16.dp))
 
                         // Mentor Info Row
                         Row(
@@ -211,7 +265,7 @@ fun MentorDetailScreen(
 
                             Spacer(Modifier.width(16.dp))
 
-                            // Profile Image
+                            // Profile Image — load real URL or fallback to initials
                             Box(
                                 modifier = Modifier
                                     .size(80.dp)
@@ -226,12 +280,23 @@ fun MentorDetailScreen(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = mentor.name.take(1),
-                                    fontSize = 32.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                if (mentor.imageUrl.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = mentor.imageUrl,
+                                        contentDescription = "${mentor.name}'s photo",
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(
+                                        text = mentor.name.take(1),
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
 
@@ -263,8 +328,8 @@ fun MentorDetailScreen(
                     )
 
                     // Parse and display about me with highlighted keywords
-                    Text(
-                        text = buildAnnotatedString {
+                    val annotatedAboutMe = remember(mentor.aboutMe) {
+                        androidx.compose.ui.text.buildAnnotatedString {
                             val keywords = listOf(
                                 "Java", "Full Stack", "High-Level", "Low-Level", "HLD/LLD",
                                 "design patterns", "problem-solving", "competitive programming",
@@ -274,7 +339,10 @@ fun MentorDetailScreen(
                                 "Singleton", "Factory", "Observer", "Builder", "Docker", "Kubernetes",
                                 "Jenkins", "CI/CD", "AWS", "GCP", "Terraform", "Ansible", "JFrog",
                                 "Prometheus", "Grafana", "React", "Angular", "Next.js", "HTML",
-                                "CSS", "JavaScript", "MySQL", "PostgreSQL", "MongoDB", "Redis"
+                                "CSS", "JavaScript", "MySQL", "PostgreSQL", "MongoDB", "Redis",
+                                "Swift", "SwiftUI", "iOS", "Kotlin", "Android", "Python",
+                                "Machine Learning", "AI", "TypeScript", "Node.js", "Figma",
+                                "UI/UX", "Design Systems", "DevOps", "Cloud"
                             )
 
                             var remainingText = mentor.aboutMe
@@ -305,7 +373,10 @@ fun MentorDetailScreen(
 
                                 remainingText = remainingText.substring(index + keyword.length)
                             }
-                        },
+                        }
+                    }
+                    Text(
+                        text = annotatedAboutMe,
                         fontSize = 15.sp,
                         color = Color(0xFFCCCCCC),
                         lineHeight = 24.sp
@@ -348,6 +419,64 @@ fun MentorDetailScreen(
                         }
                     }
 
+                    Spacer(Modifier.height(32.dp))
+
+                    // Offerings Section
+                    Text(
+                        text = "Services & Offerings",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    offerings.forEachIndexed { index, offering ->
+                        val isSelected = selectedOfferingIndex == index
+                        val computedPrice = (priceAmount * offering.second).toInt()
+                        
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) Color(0xFF6C5CE7).copy(alpha = 0.2f) else Color(0xFF2C2C2E)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) Color(0xFF6C5CE7) else Color(0xFF3A3A3C)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            onClick = { selectedOfferingIndex = index }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = offering.first,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = if (offering.first == "Mock Interview") "45 min video call" else "30 min video/chat",
+                                        fontSize = 13.sp,
+                                        color = Color(0xFFAAAAAA)
+                                    )
+                                }
+                                Text(
+                                    text = "₹$computedPrice",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color(0xFFB8B8FF) else Color.White
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(100.dp)) // Space for bottom button
                 }
             }
@@ -371,13 +500,13 @@ fun MentorDetailScreen(
                     // Price
                     Column {
                         Text(
-                            text = "₹${mentor.price.replace("$", "")}",
+                            text = "₹$currentPriceAmount",
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
-                            text = "per session",
+                            text = "for ${offerings[selectedOfferingIndex].first}",
                             fontSize = 13.sp,
                             color = Color(0xFF888888)
                         )
@@ -385,7 +514,7 @@ fun MentorDetailScreen(
 
                     // Get Access Button
                     Button(
-                        onClick = { startPayment() },
+                        onClick = { requestPayment() },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50)

@@ -1,24 +1,27 @@
 package com.example.auth.presentation.inApp.profilescreen
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
-
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.Color
-
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,22 +29,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.modifier.modifierLocalConsumer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.auth.data.local.DsaDao
 import com.example.auth.data.repository.CodingPlatformStatsRepository
 import com.example.auth.presentation.authentication.AuthViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
+// ── Platform accent colours ───────────────────────────────────────────────────
+private fun platformColor(name: String) = when (name.lowercase()) {
+    "leetcode"   -> Color(0xFFffa116)
+    "codeforces" -> Color(0xFF1f8acb)
+    "codechef"   -> Color(0xFF5B4638)
+    "hackerrank" -> Color(0xFF2EC866)
+    "atcoder"    -> Color(0xFF888888)
+    "github"     -> Color(0xFF6e5494)
+    else         -> Color(0xFF6C5CE7)
+}
+
+// ── Avatar gradient ──────────────────────────────────────────────────────────
+private val avatarGradient = Brush.linearGradient(
+    listOf(Color(0xFF6C5CE7), Color(0xFF0984E3))
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -49,577 +74,545 @@ fun ProfileScreen(
     viewModel: AuthViewModel = hiltViewModel(),
     onNavigateToLogin: () -> Unit = {}
 ) {
-    val scope = rememberCoroutineScope()
+    val scope       = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val context     = LocalContext.current
     val statsRepository = remember { CodingPlatformStatsRepository() }
 
-    // User data state
-    var userName by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
+    // ── User state ────────────────────────────────────────────────────────────
+    var userName    by remember { mutableStateOf("") }
+    var email       by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
-    var phoneNumber by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(true) }
+    var bio         by remember { mutableStateOf("") }
+    var photoUri    by remember { mutableStateOf<Uri?>(null) }   // local pick
+    var photoUrl    by remember { mutableStateOf("") }           // Firestore URL
+    var isLoading   by remember { mutableStateOf(true) }
     var userNotFound by remember { mutableStateOf(false) }
 
-    // Coding platforms state
+    // ── DSA stats (from Room) ─────────────────────────────────────────────────
+    var dsaSolved by remember { mutableIntStateOf(0) }
+    var dsaTotal  by remember { mutableIntStateOf(0) }
+
+    // ── Coding platforms ───────────────────────────────────────────────────────
     val platforms = remember { mutableStateListOf<CodingPlatform>() }
 
-    // Load user data
+    // ── Bio edit state ─────────────────────────────────────────────────────────
+    var showBioEdit by remember { mutableStateOf(false) }
+    var editingBio  by remember { mutableStateOf("") }
+
+    // ── Name edit state ────────────────────────────────────────────────────────
+    var showNameEdit  by remember { mutableStateOf(false) }
+    var editingName   by remember { mutableStateOf("") }
+
+    // ── Logout confirm ─────────────────────────────────────────────────────────
+    var showLogout by remember { mutableStateOf(false) }
+
+    // ── Image picker ───────────────────────────────────────────────────────────
+    val pickMedia = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> if (uri != null) photoUri = uri }
+
+    // ── Load data ──────────────────────────────────────────────────────────────
     LaunchedEffect(Unit) {
+        // DSA stats from Room via Hilt EntryPoint
+        try {
+            val hiltEntryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                DsaDaoEntryPoint::class.java
+            )
+            val dao = hiltEntryPoint.dsaDao()
+            dsaSolved = dao.getTotalSolvedGlobal()
+            dsaTotal  = dao.getTotalQuestionsGlobal()
+        } catch (_: Exception) {}
+
+        // Firebase user data
         val currentUser = FirebaseAuth.getInstance().currentUser
         if (currentUser != null) {
             try {
-                val db = FirebaseFirestore.getInstance()
-                val document = db.collection("users")
-                    .document(currentUser.uid)
-                    .get()
-                    .await()
+                val doc = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    FirebaseFirestore.getInstance()
+                        .collection("users")
+                        .document(currentUser.uid)
+                        .get()
+                        .await()
+                }
+                if (doc.exists()) {
+                    userName    = doc.getString("userName")    ?: ""
+                    email       = doc.getString("email")       ?: ""
+                    displayName = doc.getString("displayName") ?: ""
+                    bio         = doc.getString("bio")         ?: ""
+                    photoUrl    = doc.getString("photoUrl")    ?: ""
 
-                if (document.exists()) {
-                    userName = document.getString("userName") ?: ""
-                    email = document.getString("email") ?: ""
-                    displayName = document.getString("displayName") ?: ""
-                    phoneNumber = document.getString("phoneNumber") ?: ""
+                    val platformsData = doc.get("codingPlatforms") as? List<Map<String, String>>
+                    platformsData?.forEach { pm ->
+                        val pName  = pm["name"]    ?: return@forEach
+                        val pUser  = pm["username"] ?: ""
+                        val pStats = pm["stats"]    ?: "N/A"
+                        val pLabel = pm["statsLabel"] ?: ""
+                        val pImg   = pm["profileImageUrl"]?.takeIf { it.isNotEmpty() }
+                        platforms.add(CodingPlatform(pName, pUser, pStats, pLabel, Icons.Default.Star, pImg))
 
-                    // Load coding platforms if they exist
-                    val platformsData = document.get("codingPlatforms") as? List<Map<String, String>>
-                    platformsData?.forEach { platformMap ->
-                        val platformName = platformMap["name"] ?: ""
-                        val username = platformMap["username"] ?: ""
-                        val existingStats = platformMap["stats"] ?: "N/A"
-                        val existingLabel = platformMap["statsLabel"] ?: ""
-                        
-                        val existingImageUrl = platformMap["profileImageUrl"]?.takeIf { it.isNotEmpty() }
-                        
-                        // Add platform first with existing or loading state
-                        platforms.add(
-                            CodingPlatform(
-                                name = platformName,
-                                username = username,
-                                stats = if (existingStats == "N/A") "N/A" else existingStats,
-                                statsLabel = if (existingLabel == "Loading..." || existingStats == "N/A") "Loading..." else existingLabel,
-                                icon = Icons.Default.Star,
-                                profileImageUrl = existingImageUrl
-                            )
-                        )
-                        
-                        // Fetch real stats in background if stats are N/A or Loading
-                        if (existingStats == "N/A" || existingLabel == "Loading...") {
+                        if (pStats == "N/A" || pLabel == "Loading...") {
                             scope.launch {
                                 try {
-                                    val platformStats = statsRepository.fetchStats(platformName, username)
-                                    // Update the platform in the list
-                                    val index = platforms.indexOfFirst { 
-                                        it.name == platformName && it.username == username 
-                                    }
-                                    if (index >= 0) {
-                                        platforms[index] = platforms[index].copy(
-                                            stats = platformStats.rating,
-                                            statsLabel = platformStats.statsLabel,
-                                            profileImageUrl = platformStats.profileImageUrl
+                                    val s = statsRepository.fetchStats(pName, pUser)
+                                    val idx = platforms.indexOfFirst { it.name == pName && it.username == pUser }
+                                    if (idx >= 0) {
+                                        platforms[idx] = platforms[idx].copy(
+                                            stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl
                                         )
-                                        
-                                        // Update Firestore with fetched stats
-                                        val db = FirebaseFirestore.getInstance()
-                                        val platformsList = platforms.map {
-                                            mapOf(
-                                                "name" to it.name,
-                                                "username" to it.username,
-                                                "stats" to it.stats,
-                                                "statsLabel" to it.statsLabel,
-                                                "profileImageUrl" to (it.profileImageUrl ?: "")
-                                            )
-                                        }
-                                        db.collection("users")
-                                            .document(currentUser.uid)
-                                            .update("codingPlatforms", platformsList)
-                                            .await()
+                                        saveplatformsToFirestore(currentUser.uid, platforms)
                                     }
-                                } catch (e: Exception) {
-                                    android.util.Log.e("ProfileScreen", "Error fetching stats: ${e.message}")
-                                }
+                                } catch (_: Exception) {}
                             }
                         }
                     }
-                } else {
-                    userNotFound = true
+                } else userNotFound = true
+            } catch (_: Exception) { userNotFound = true }
+            finally { isLoading = false }
+        } else { isLoading = false; userNotFound = true }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    fun saveBio(newBio: String) {
+        bio = newBio
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        scope.launch {
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    FirebaseFirestore.getInstance().collection("users").document(uid)
+                        .update("bio", newBio).await()
                 }
-            } catch (e: Exception) {
-                userNotFound = true
-            } finally {
-                isLoading = false
-            }
-        } else {
-            isLoading = false
-            userNotFound = true
+            } catch (_: Exception) {}
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Profile",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    if (navController != null) {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                actions = {
-                    IconButton(onClick = { /* Settings */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+    fun saveName(newName: String) {
+        displayName = newName
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        scope.launch {
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    FirebaseFirestore.getInstance().collection("users").document(uid)
+                        .update("displayName", newName).await()
                 }
-            )
+            } catch (_: Exception) {}
         }
-    ) { paddingValues ->
+    }
+
+    // ── UI ─────────────────────────────────────────────────────────────────────
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         when {
-            isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+
+            userNotFound -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(32.dp)) {
+                    Text("👤", fontSize = 64.sp)
+                    Text("Not logged in", style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface)
                 }
             }
-            userNotFound -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(80.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Please log in to view profile",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+
+            else -> Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(bottom = 100.dp)
+            ) {
+                // ── 1. Profile hero card ──────────────────────────────────────
+                ProfileHeroCard(
+                    displayName = displayName,
+                    userName    = userName,
+                    email       = email,
+                    bio         = bio,
+                    photoUri    = photoUri,
+                    photoUrl    = photoUrl,
+                    dsaSolved   = dsaSolved,
+                    dsaTotal    = dsaTotal,
+                    platformCount = platforms.size,
+                    onPickPhoto  = { pickMedia.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )},
+                    onEditName   = { editingName = displayName; showNameEdit = true },
+                    onEditBio    = { editingBio = bio; showBioEdit = true }
+                )
+
+                Spacer(Modifier.height(20.dp))
+
+                // ── 2. Coding profiles ────────────────────────────────────────
+                CodingPlatformsSection(
+                    platforms       = platforms,
+                    statsRepository = statsRepository,
+                    onPlatformAdded = { pName, pUser ->
+                        scope.launch {
+                            if (platforms.any { it.name.equals(pName, ignoreCase = true) }) return@launch
+                            val np = CodingPlatform(pName, pUser, "N/A", "Loading...", Icons.Default.Star, null)
+                            platforms.add(np)
+                            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+                            saveplatformsToFirestore(uid, platforms)
+                            try {
+                                val s = statsRepository.fetchStats(pName, pUser)
+                                val idx = platforms.indexOfFirst { it.name == pName && it.username == pUser }
+                                if (idx >= 0) {
+                                    platforms[idx] = platforms[idx].copy(stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl)
+                                    saveplatformsToFirestore(uid, platforms)
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    },
+                    onPlatformRemoved = { plat ->
+                        scope.launch {
+                            platforms.remove(plat)
+                            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+                            saveplatformsToFirestore(uid, platforms)
+                        }
+                    },
+                    onPlatformRefresh = { plat ->
+                        scope.launch {
+                            val idx = platforms.indexOfFirst { it.name == plat.name && it.username == plat.username }
+                            if (idx < 0) return@launch
+                            platforms[idx] = platforms[idx].copy(stats = "N/A", statsLabel = "Loading...")
+                            try {
+                                val s = statsRepository.fetchStats(plat.name, plat.username)
+                                platforms[idx] = platforms[idx].copy(stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl)
+                                val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+                                saveplatformsToFirestore(uid, platforms)
+                            } catch (_: Exception) {
+                                platforms[idx] = platforms[idx].copy(stats = "Error", statsLabel = "Failed to load")
+                            }
+                        }
                     }
-                }
-            }
-            else -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .verticalScroll(scrollState)
-                        .background(MaterialTheme.colorScheme.background)
-                ) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                )
 
-                    // Profile Header
-                    ProfileHeader(
-                        userName = userName,
-                        email = email,
-                        displayName = displayName
-                    )
+                Spacer(Modifier.height(28.dp))
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                // ── 3. Logout ─────────────────────────────────────────────────
+                LogoutButton(onClick = { showLogout = true })
 
-                    // Personal Info Card
-//                    PersonalInfoCard(
-//                        email = email,
-//                        phoneNumber = phoneNumber,
-//                        displayName = displayName
-//                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Coding Platforms Section
-                    CodingPlatformsSection(
-                        platforms = platforms,
-                        statsRepository = statsRepository,
-                        onPlatformAdded = { platformName, username ->
-                            scope.launch {
-                                // Check if platform already exists (safety check)
-                                val alreadyExists = platforms.any { 
-                                    it.name.equals(platformName, ignoreCase = true) 
-                                }
-                                
-                                if (alreadyExists) {
-                                    android.util.Log.w("ProfileScreen", "Platform $platformName already exists, skipping add")
-                                    return@launch
-
-
-                                }
-                                
-                                // Add to local list with loading state
-                                val newPlatform = CodingPlatform(
-                                    platformName,
-                                    username,
-                                    "N/A",
-                                    "Loading...",
-                                    Icons.Default.Star,
-                                    null
-                                )
-                                platforms.add(newPlatform)
-
-                                // Save to Firestore first with loading state
-                                val currentUser = FirebaseAuth.getInstance().currentUser
-                                if (currentUser != null) {
-                                    val db = FirebaseFirestore.getInstance()
-                                    val platformsList = platforms.map {
-                                        mapOf(
-                                            "name" to it.name,
-                                            "username" to it.username,
-                                            "stats" to it.stats,
-                                            "statsLabel" to it.statsLabel,
-                                            "profileImageUrl" to (it.profileImageUrl ?: "")
-                                        )
-                                    }
-                                    db.collection("users")
-                                        .document(currentUser.uid)
-                                        .update("codingPlatforms", platformsList)
-                                        .await()
-                                    
-                                    // Now fetch real stats
-                                    try {
-                                        val platformStats = statsRepository.fetchStats(platformName, username)
-                                        
-                                        // Update the platform in the list
-                                        val index = platforms.indexOfFirst { 
-                                            it.name == platformName && it.username == username 
-                                        }
-                                        if (index >= 0) {
-                                            platforms[index] = platforms[index].copy(
-                                                stats = platformStats.rating,
-                                                statsLabel = platformStats.statsLabel,
-                                                profileImageUrl = platformStats.profileImageUrl
-                                            )
-                                            
-                                            // Update Firestore with fetched stats
-                                            val updatedPlatformsList = platforms.map {
-                                                mapOf(
-                                                    "name" to it.name,
-                                                    "username" to it.username,
-                                                    "stats" to it.stats,
-                                                    "statsLabel" to it.statsLabel,
-                                                    "profileImageUrl" to (it.profileImageUrl ?: "")
-                                                )
-                                            }
-                                            db.collection("users")
-                                                .document(currentUser.uid)
-                                                .update("codingPlatforms", updatedPlatformsList)
-                                                .await()
-                                        }
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("ProfileScreen", "Error fetching stats for new platform: ${e.message}")
-                                        // Update to show error state
-                                        val index = platforms.indexOfFirst { 
-                                            it.name == platformName && it.username == username 
-                                        }
-                                        if (index >= 0) {
-                                            platforms[index] = platforms[index].copy(
-                                                stats = "Error",
-                                                statsLabel = "Failed to load"
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        onPlatformRemoved = { platform ->
-                            scope.launch {
-                                platforms.remove(platform)
-
-                                // Update Firestore
-                                val currentUser = FirebaseAuth.getInstance().currentUser
-                                if (currentUser != null) {
-                                    val db = FirebaseFirestore.getInstance()
-                                    val platformsList = platforms.map {
-                                        mapOf(
-                                            "name" to it.name,
-                                            "username" to it.username,
-                                            "stats" to it.stats,
-                                            "statsLabel" to it.statsLabel,
-                                            "profileImageUrl" to (it.profileImageUrl ?: "")
-                                        )
-                                    }
-                                    db.collection("users")
-                                        .document(currentUser.uid)
-                                        .update("codingPlatforms", platformsList)
-                                        .await()
-                                }
-                            }
-                        },
-                        onPlatformRefresh = { platform ->
-                            scope.launch {
-                                try {
-                                    // Update to loading state
-                                    val index = platforms.indexOfFirst { 
-                                        it.name == platform.name && it.username == platform.username 
-                                    }
-                                    if (index >= 0) {
-                                        platforms[index] = platforms[index].copy(
-                                            stats = "N/A",
-                                            statsLabel = "Loading..."
-                                        )
-                                        
-                                        // Fetch fresh stats
-                                        val platformStats = statsRepository.fetchStats(platform.name, platform.username)
-                                        
-                                        // Update with fetched stats
-                                        platforms[index] = platforms[index].copy(
-                                            stats = platformStats.rating,
-                                            statsLabel = platformStats.statsLabel,
-                                            profileImageUrl = platformStats.profileImageUrl
-                                        )
-                                        
-                                        // Update Firestore
-                                        val currentUser = FirebaseAuth.getInstance().currentUser
-                                        if (currentUser != null) {
-                                            val db = FirebaseFirestore.getInstance()
-                                            val platformsList = platforms.map {
-                                                mapOf(
-                                                    "name" to it.name,
-                                                    "username" to it.username,
-                                                    "stats" to it.stats,
-                                                    "statsLabel" to it.statsLabel,
-                                                    "profileImageUrl" to (it.profileImageUrl ?: "")
-                                                )
-                                            }
-                                            db.collection("users")
-                                                .document(currentUser.uid)
-                                                .update("codingPlatforms", platformsList)
-                                                .await()
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    android.util.Log.e("ProfileScreen", "Error refreshing stats: ${e.message}")
-                                    val index = platforms.indexOfFirst { 
-                                        it.name == platform.name && it.username == platform.username 
-                                    }
-                                    if (index >= 0) {
-                                        platforms[index] = platforms[index].copy(
-                                            stats = "Error",
-                                            statsLabel = "Failed to load"
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Stats Card
-//                    StatsCard()
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Settings Section
-                    SettingsSection()
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Logout Button
-                    LogoutButton(
-                        onLogout = {
-                            scope.launch {
-                                FirebaseAuth.getInstance().signOut()
-                                onNavigateToLogin()
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
+                Spacer(Modifier.height(16.dp))
             }
         }
+    }
+
+    // ── Bio edit dialog ───────────────────────────────────────────────────────
+    if (showBioEdit) {
+        AlertDialog(
+            onDismissRequest = { showBioEdit = false },
+            title = { Text("Edit Bio", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editingBio,
+                        onValueChange = { if (it.length <= 180) editingBio = it },
+                        placeholder = { Text("Write something about yourself…") },
+                        modifier = Modifier.fillMaxWidth().height(130.dp),
+                        maxLines = 5,
+                        shape = RoundedCornerShape(12.dp),
+                        supportingText = { Text("${editingBio.length}/180",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End) }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { saveBio(editingBio); showBioEdit = false }) {
+                    Text("Save", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBioEdit = false }) { Text("Cancel") }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    // ── Name edit dialog ──────────────────────────────────────────────────────
+    if (showNameEdit) {
+        AlertDialog(
+            onDismissRequest = { showNameEdit = false },
+            title = { Text("Edit Name", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = editingName,
+                    onValueChange = { editingName = it },
+                    label = { Text("Display Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { saveName(editingName.trim()); showNameEdit = false }) {
+                    Text("Save", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNameEdit = false }) { Text("Cancel") }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    // ── Logout confirm dialog ─────────────────────────────────────────────────
+    if (showLogout) {
+        AlertDialog(
+            onDismissRequest = { showLogout = false },
+            title = { Text("Logout?", fontWeight = FontWeight.Bold) },
+            text = { Text("You will be signed out of your account.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogout = false
+                    scope.launch {
+                        FirebaseAuth.getInstance().signOut()
+                        onNavigateToLogin()
+                    }
+                }) {
+                    Text("Logout", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogout = false }) { Text("Cancel") }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 }
 
+// ── Helper ────────────────────────────────────────────────────────────────────
+
+private suspend fun saveplatformsToFirestore(uid: String, platforms: List<CodingPlatform>) {
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        FirebaseFirestore.getInstance().collection("users").document(uid)
+            .update("codingPlatforms", platforms.map {
+                mapOf("name" to it.name, "username" to it.username,
+                    "stats" to it.stats, "statsLabel" to it.statsLabel,
+                    "profileImageUrl" to (it.profileImageUrl ?: ""))
+            }).await()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profile Hero Card
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-private fun ProfileHeader(
+private fun ProfileHeroCard(
+    displayName: String,
     userName: String,
     email: String,
-    displayName: String
+    bio: String,
+    photoUri: Uri?,
+    photoUrl: String,
+    dsaSolved: Int,
+    dsaTotal: Int,
+    platformCount: Int,
+    onPickPhoto: () -> Unit,
+    onEditName: () -> Unit,
+    onEditBio: () -> Unit
 ) {
-    val firstLetter = if (userName.isNotEmpty()) userName.first().uppercase() else "U"
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // ── Gradient banner ───────────────────────────────────────────────────
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Avatar
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape)
-                    .background(brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF212139),  // top color
-                            Color(0xFF7B3EFF)   // bottom color
-                        )
-                    )),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = firstLetter,
-                    style = MaterialTheme.typography.displayMedium,
-                    color = Color(0xFFE0E0E0),
-                    fontWeight = FontWeight.Bold
+                .height(130.dp)
+                .background(
+                    Brush.linearGradient(listOf(Color(0xFF4F46E5), Color(0xFF0EA5E9)))
                 )
+        )
+
+        // ── Avatar overlapping banner ─────────────────────────────────────────
+        Box(modifier = Modifier.fillMaxWidth().offset(y = (-48).dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
+                // Avatar + edit button
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .size(90.dp)
+                            .clip(CircleShape)
+                            .background(avatarGradient)
+                            .border(3.dp, MaterialTheme.colorScheme.background, CircleShape)
+                            .clickable { onPickPhoto() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val imageModel: Any? = photoUri ?: photoUrl.takeIf { it.isNotBlank() }
+                        if (imageModel != null) {
+                            AsyncImage(
+                                model = imageModel,
+                                contentDescription = "Profile photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        } else {
+                            Text(
+                                text = (displayName.firstOrNull() ?: userName.firstOrNull() ?: 'U').uppercase(),
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                    // Camera badge
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .align(Alignment.BottomEnd)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .border(2.dp, MaterialTheme.colorScheme.background, CircleShape)
+                            .clickable { onPickPhoto() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.CameraAlt, null,
+                            modifier = Modifier.size(14.dp), tint = Color.White)
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // Name row + edit
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = displayName.ifEmpty { userName.ifEmpty { "User" } },
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    IconButton(
+                        onClick = onEditName,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, "Edit name",
+                            modifier = Modifier.size(15.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                if (userName.isNotBlank()) {
+                    Text("@$userName", fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (email.isNotBlank()) {
+                    Text(email, fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        // Compensate the offset
+        Spacer(Modifier.height((-36).dp))
+
+        // ── Stats pills row ───────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            StatPill(
+                emoji   = "🔥",
+                value   = "$dsaSolved",
+                label   = "Solved",
+                modifier = Modifier.weight(1f)
+            )
+            StatPill(
+                emoji   = "📊",
+                value   = if (dsaTotal > 0) "${(dsaSolved * 100f / dsaTotal).toInt()}%" else "0%",
+                label   = "Progress",
+                modifier = Modifier.weight(1f)
+            )
+            StatPill(
+                emoji   = "🏆",
+                value   = "$platformCount",
+                label   = "Profiles",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Bio section ───────────────────────────────────────────────────────
+        Column(modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)) {
+
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()) {
+                Text("About Me", fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onBackground)
+                TextButton(
+                    onClick = onEditBio,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                ) {
+                    Text(if (bio.isBlank()) "Add Bio" else "Edit",
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Username
-            Text(
-                text = displayName.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase() else it.toString()
-                }.ifEmpty { "User" },
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-
-
-            // Display Name
-//            if (displayName.isNotEmpty() && displayName != userName) {
-//                Spacer(modifier = Modifier.height(4.dp))
-//                Text(
-//                    text = displayName,
-//                    style = MaterialTheme.typography.titleMedium,
-//                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-//                )
-//            }
-
-            // Email
-            if (email.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+            if (bio.isBlank()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = "Tap 'Add Bio' to write something about yourself…",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(14.dp),
+                        lineHeight = 20.sp
+                    )
+                }
+            } else {
                 Text(
-                    text = email,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    text = bio,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 22.sp
                 )
             }
         }
     }
 }
 
+// ── Stat pill ─────────────────────────────────────────────────────────────────
+
 @Composable
-private fun PersonalInfoCard(
-    email: String,
-    phoneNumber: String,
-    displayName: String
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+private fun StatPill(emoji: String, value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Personal Information",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            InfoRow("Display Name", displayName.ifEmpty { "Not set" })
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
-            InfoRow("Email", email.ifEmpty { "Not set" })
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
-            InfoRow("Phone", phoneNumber.ifEmpty { "Not set" })
+            Text(emoji, fontSize = 18.sp)
+            Spacer(Modifier.height(2.dp))
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium)
         }
     }
 }
 
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun Education(
-    education: String,
-    onCollageAdded : () -> Unit,
-    onCollageRemoved : () -> Unit,
-    onLinkedInAdded : () -> Unit,
-    onLinkedInRemoved : () -> Unit,
-
-    // also want here twitter
-) {
-    Column(
-
-    ) { }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Coding Platforms Section
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun CodingPlatformsSection(
@@ -629,65 +622,49 @@ private fun CodingPlatformsSection(
     onPlatformRemoved: (CodingPlatform) -> Unit,
     onPlatformRefresh: (CodingPlatform) -> Unit
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
+    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+        // Header
+        Row(modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Coding Profiles",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-
-            FilledIconButton(
-                onClick = { showAddDialog = true },
-                modifier = Modifier.size(40.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+            verticalAlignment = Alignment.CenterVertically) {
+            Text("Coding Profiles", fontWeight = FontWeight.Bold, fontSize = 17.sp,
+                color = MaterialTheme.colorScheme.onBackground)
+            FilledTonalIconButton(
+                onClick = { showAddSheet = true },
+                modifier = Modifier.size(36.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add Platform",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+                Icon(Icons.Default.Add, "Add", modifier = Modifier.size(18.dp))
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
         if (platforms.isEmpty()) {
-            EmptyPlatformsCard(onAddClick = { showAddDialog = true })
+            EmptyPlatformsCard { showAddSheet = true }
         } else {
-
-
-
             platforms.forEach { platform ->
                 PlatformCard(
-                    platform = platform,
-                    onRemove = { onPlatformRemoved(platform) },
+                    platform  = platform,
+                    onRemove  = { onPlatformRemoved(platform) },
                     onRefresh = { onPlatformRefresh(platform) }
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
             }
         }
     }
 
-    if (showAddDialog) {
-        AddPlatformDialog(
+    if (showAddSheet) {
+        AddPlatformBottomSheet(
             existingPlatforms = platforms,
-            onDismiss = { showAddDialog = false },
-            onAdd = { platformName, username ->
-                onPlatformAdded(platformName, username)
-                showAddDialog = false
-            }
+            onDismiss = { showAddSheet = false },
+            onAdd     = { p, u -> onPlatformAdded(p, u); showAddSheet = false }
         )
     }
 }
+
+// ── Platform Card ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun PlatformCard(
@@ -697,409 +674,288 @@ private fun PlatformCard(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
+    val accent = platformColor(platform.name)
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Platform Icon or Profile Image
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Accent left bar
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        when (platform.name) {
-                            "GitHub" -> Color(0xFF6e5494)
-                            "LeetCode" -> Color(0xFFffa116)
-                            "Codeforces" -> Color(0xFF1f8acb)
-                            "CodeChef" -> Color(0xFF5B4638)
-                            "HackerRank" -> Color(0xFF2EC866)
-                            "AtCoder" -> Color(0xFF000000)
-                            else -> MaterialTheme.colorScheme.primary
-                        }
-                    ),
-                contentAlignment = Alignment.Center
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accent, RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                if (platform.profileImageUrl != null && platform.profileImageUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = platform.profileImageUrl,
-                        contentDescription = "${platform.name} profile",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                } else {
-                    // Fallback to platform icon if no image URL
-                    Text(
-                        text = platform.name.first().toString(),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = platform.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "@${platform.username}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${platform.stats} ${platform.statsLabel}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More")
-                }
-
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(accent.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("View Profile") },
-                        onClick = { 
-                            showMenu = false
-                            val url = getProfileUrl(platform.name, platform.username)
-                            if (url.isNotEmpty()) {
-                                uriHandler.openUri(url)
-                            }
-                        },
-                        leadingIcon = { Icon(Icons.Default.ExitToApp, null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Refresh") },
-                        onClick = {
-                            showMenu = false
-                            onRefresh()
-                        },
-                        leadingIcon = { Icon(Icons.Default.Refresh, null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
-                        onClick = {
-                            showMenu = false
-                            onRemove()
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Delete,
-                                null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    )
+                    if (!platform.profileImageUrl.isNullOrEmpty()) {
+                        AsyncImage(
+                            model = platform.profileImageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+                        )
+                    } else {
+                        Text(platform.name.first().uppercase(), fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold, color = accent)
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(platform.name, fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface)
+                    Text("@${platform.username}", fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(4.dp))
+                    // Stats chip
+                    Surface(shape = RoundedCornerShape(6.dp), color = accent.copy(alpha = 0.1f)) {
+                        Text(
+                            text = when {
+                                platform.statsLabel == "Loading..." -> "⏳ Loading…"
+                                platform.statsLabel.startsWith(platform.stats) -> platform.statsLabel
+                                platform.stats != "N/A" -> "${platform.stats}  ·  ${platform.statsLabel}"
+                                else -> platform.statsLabel.ifEmpty { "—" }
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = accent,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("View Profile") },
+                            onClick = {
+                                showMenu = false
+                                val url = getProfileUrl(platform.name, platform.username)
+                                if (url.isNotEmpty()) uriHandler.openUri(url)
+                            },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.ArrowForward, null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Refresh") },
+                            onClick = { showMenu = false; onRefresh() },
+                            leadingIcon = { Icon(Icons.Default.Refresh, null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Remove", color = MaterialTheme.colorScheme.error) },
+                            onClick = { showMenu = false; onRemove() },
+                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+// ── Empty platforms card ──────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyPlatformsCard(onAddClick: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+        color = MaterialTheme.colorScheme.surface
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
+            modifier = Modifier.fillMaxWidth().padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = Icons.Default.Star,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "No Profiles Added",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Add your coding platform profiles to showcase your skills",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onAddClick,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Add, null, Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Add Platform")
+            Text("🏆", fontSize = 40.sp)
+            Spacer(Modifier.height(12.dp))
+            Text("Link your coding profiles",
+                fontWeight = FontWeight.Bold, fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(4.dp))
+            Text("Track LeetCode, Codeforces, GitHub and more",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center)
+            Spacer(Modifier.height(20.dp))
+            FilledTonalButton(onClick = onAddClick, shape = RoundedCornerShape(12.dp)) {
+                Icon(Icons.Default.Add, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Add Profile")
             }
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Add Platform Bottom Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddPlatformDialog(
+private fun AddPlatformBottomSheet(
     existingPlatforms: List<CodingPlatform>,
     onDismiss: () -> Unit,
     onAdd: (String, String) -> Unit
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedPlatform by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val allPlatforms = listOf("GitHub", "LeetCode", "Codeforces", "CodeChef", "HackerRank", "AtCoder")
-    
-    // Filter out already added platforms
-    val availablePlatforms = allPlatforms.filter { platformName ->
-        !existingPlatforms.any { it.name.equals(platformName, ignoreCase = true) }
+    data class PlatformOption(val name: String, val emoji: String, val color: Color)
+    val allPlatforms = listOf(
+        PlatformOption("LeetCode",   "🧩", Color(0xFFffa116)),
+        PlatformOption("Codeforces", "⚡", Color(0xFF1f8acb)),
+        PlatformOption("CodeChef",   "👨‍🍳", Color(0xFF5B4638)),
+        PlatformOption("GitHub",     "🐙", Color(0xFF6e5494)),
+        PlatformOption("HackerRank", "🌏", Color(0xFF2EC866)),
+        PlatformOption("AtCoder",    "🏔️", Color(0xFF888888))
+    )
+    val available = allPlatforms.filterNot { opt ->
+        existingPlatforms.any { it.name.equals(opt.name, ignoreCase = true) }
     }
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Add Coding Platform", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded }
-                ) {
-                    OutlinedTextField(
-                        value = selectedPlatform,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Platform") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor()
-                    )
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("Add Coding Profile", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface)
+            Text("Choose a platform and enter your handle",
+                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 20.dp))
 
-                    ExposedDropdownMenu(expanded, { expanded = false }) {
-                        if (availablePlatforms.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("All platforms added", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                                onClick = { expanded = false },
-                                enabled = false
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp)
+            ) {
+                items(available) { opt ->
+                    val isSelected = selectedPlatform == opt.name
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) opt.color else MaterialTheme.colorScheme.outlineVariant,
+                                shape = RoundedCornerShape(14.dp)
                             )
-                        } else {
-                            availablePlatforms.forEach { platform ->
-                                DropdownMenuItem(
-                                    text = { Text(platform) },
-                                    onClick = {
-                                        selectedPlatform = platform
-                                        expanded = false
-                                        errorMessage = null // Clear error when platform changes
-                                    }
-                                )
-                            }
-                        }
+                            .background(
+                                if (isSelected) opt.color.copy(alpha = 0.1f)
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .clickable { selectedPlatform = opt.name; errorMessage = null }
+                            .padding(vertical = 14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(opt.emoji, fontSize = 22.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(opt.name, fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) opt.color else MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center)
                     }
                 }
-
-                Spacer(Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { 
-                        username = it
-                        errorMessage = null // Clear error when username changes
-                    },
-                    label = { Text("Username") },
-                    placeholder = { Text("Enter your username") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    leadingIcon = { Icon(Icons.Default.Person, null) },
-                    isError = errorMessage != null
-                )
-                
-                // Show error message if duplicate
-                if (errorMessage != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = errorMessage!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                }
             }
-        },
-        confirmButton = {
+
+            Spacer(Modifier.height(20.dp))
+
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it; errorMessage = null },
+                label = { Text("Your Username / Handle") },
+                placeholder = { Text(if (selectedPlatform.isNotEmpty()) "e.g. tourist" else "Select a platform first") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = selectedPlatform.isNotEmpty(),
+                leadingIcon = { Icon(Icons.Default.Person, null) },
+                isError = errorMessage != null,
+                supportingText = { errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) } },
+                shape = RoundedCornerShape(14.dp)
+            )
+
+            Spacer(Modifier.height(20.dp))
+
             Button(
                 onClick = {
-                    // Check for duplicate (double-check even though dropdown filters)
-                    val isDuplicate = existingPlatforms.any { 
-                        it.name.equals(selectedPlatform, ignoreCase = true) 
-                    }
-                    
-                    if (isDuplicate) {
-                        errorMessage = "This platform is already added"
-                    } else if (selectedPlatform.isNotEmpty() && username.isNotEmpty()) {
-                        errorMessage = null
-                        onAdd(selectedPlatform, username.trim())
-                    } else {
-                        errorMessage = "Please fill all fields"
+                    when {
+                        selectedPlatform.isEmpty() -> errorMessage = "Please select a platform"
+                        username.isBlank()         -> errorMessage = "Username cannot be empty"
+                        else                       -> onAdd(selectedPlatform, username.trim())
                     }
                 },
-                enabled = selectedPlatform.isNotEmpty() && username.isNotEmpty() && availablePlatforms.isNotEmpty()
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(14.dp),
+                enabled = available.isNotEmpty()
             ) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-//@Composable
-//private fun StatsCard() {
-//    Card(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(horizontal = 16.dp),
-//        shape = RoundedCornerShape(16.dp),
-//        colors = CardDefaults.cardColors(
-//            containerColor = MaterialTheme.colorScheme.surface
-//        ),
-//        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-//    ) {
-//        Column(modifier = Modifier.padding(20.dp)) {
-//            Row(verticalAlignment = Alignment.CenterVertically) {
-//                Icon(
-//                    imageVector = Icons.Default.Star,
-//                    contentDescription = null,
-//                    tint = MaterialTheme.colorScheme.primary,
-//                    modifier = Modifier.size(24.dp)
-//                )
-//                Spacer(modifier = Modifier.width(12.dp))
-//                Text(
-//                    text = "Account Statistics",
-//                    style = MaterialTheme.typography.titleLarge,
-//                    fontWeight = FontWeight.Bold
-//                )
-//            }
-//
-//            Spacer(modifier = Modifier.height(16.dp))
-//
-//            InfoRow("Member Since", "2024")
-//            Divider(modifier = Modifier.padding(vertical = 12.dp))
-//            InfoRow("Contests Participated", "0")
-//            Divider(modifier = Modifier.padding(vertical = 12.dp))
-//            InfoRow("Profile Views", "0")
-//        }
-//    }
-//}
-
-@Composable
-private fun SettingsSection() {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column {
-                SettingsItem(Icons.Default.Notifications, "Notifications", "Manage notification preferences")
-                Divider()
-                SettingsItem(Icons.Default.Lock, "Privacy & Security", "Control your privacy settings")
-                Divider()
-                SettingsItem(Icons.Default.Info, "Help & Support", "Get help and contact support")
-                Divider()
-                SettingsItem(Icons.Default.Info, "About", "App version and information")
+                Icon(Icons.Default.Add, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add ${if (selectedPlatform.isNotEmpty()) selectedPlatform else "Platform"}",
+                    fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
-@Composable
-private fun SettingsItem(icon: ImageVector, title: String, subtitle: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(16.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(Icons.Default.ArrowForward, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Logout Button
+// ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun LogoutButton(onLogout: () -> Unit) {
-    Button(
-        onClick = onLogout,
+private fun LogoutButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.error
-        )
+            .padding(horizontal = 20.dp)
+            .height(50.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = MaterialTheme.colorScheme.error
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
     ) {
-        Icon(Icons.Default.ExitToApp, null, Modifier.size(20.dp))
+        Icon(Icons.AutoMirrored.Filled.ExitToApp, null, Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Logout", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+        Text("Logout", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
     }
 }
 
-// Data class
+// ─────────────────────────────────────────────────────────────────────────────
+// Data + helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 data class CodingPlatform(
     val name: String,
     val username: String,
@@ -1109,14 +965,12 @@ data class CodingPlatform(
     val profileImageUrl: String? = null
 )
 
-private fun getProfileUrl(platform: String, username: String): String {
-    return when (platform.lowercase()) {
-        "leetcode" -> "https://leetcode.com/u/$username/"
-        "codeforces" -> "https://codeforces.com/profile/$username"
-        "codechef" -> "https://www.codechef.com/users/$username"
-        "hackerrank" -> "https://www.hackerrank.com/profile/$username"
-        "atcoder" -> "https://atcoder.jp/users/$username"
-        "github" -> "https://github.com/$username"
-        else -> ""
-    }
+private fun getProfileUrl(platform: String, username: String) = when (platform.lowercase()) {
+    "leetcode"   -> "https://leetcode.com/u/$username/"
+    "codeforces" -> "https://codeforces.com/profile/$username"
+    "codechef"   -> "https://www.codechef.com/users/$username"
+    "hackerrank" -> "https://www.hackerrank.com/profile/$username"
+    "atcoder"    -> "https://atcoder.jp/users/$username"
+    "github"     -> "https://github.com/$username"
+    else         -> ""
 }

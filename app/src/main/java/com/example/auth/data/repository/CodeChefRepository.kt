@@ -35,10 +35,14 @@ class CodeChefRepository {
                     val profileImageUrl = json.optString("profileImage", null)
                     
                     val ratingStr = if (rating > 0) rating.toString() else "Unrated"
-                    
+                    // Clean stars string: e.g. "1★" → keep only the star tier for display, not concat with rating
+                    val starTier = stars.replace(Regex("[0-9]"), "").trim() // e.g. "★"
+                    val starsCount = stars.replace(Regex("[^0-9]"), "").trim() // e.g. "1"
+                    val tierLabel = if (starsCount.isNotEmpty()) "$starsCount $starTier Tier" else "Unrated"
+
                     return@withContext PlatformStats(
                         rating = ratingStr,
-                        statsLabel = stars.ifEmpty { "Rating" },
+                        statsLabel = tierLabel, // e.g. "1 ★ Tier" — safe to display next to rating
                         additionalInfo = mapOf(
                             "Global Rank" to globalRank,
                             "Country Rank" to countryRank,

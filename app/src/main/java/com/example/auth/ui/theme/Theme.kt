@@ -1,57 +1,57 @@
 package com.example.auth.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+/**
+ * EngiFix brand dark palette — all MaterialTheme.colorScheme references resolve to these.
+ * This ensures zero inconsistency from device-dynamic colors.
+ */
+private val EngifixDarkColorScheme = darkColorScheme(
+    primary          = Color(0xFF9D8FFF), // Brand purple (lighter for dark bg contrast)
+    onPrimary        = Color(0xFF1C1C1E),
+    primaryContainer = Color(0xFF3D3470), // Muted purple container
+    onPrimaryContainer = Color(0xFFD4CEFF),
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    secondary        = Color(0xFF8ECFF1), // Soft blue accent
+    onSecondary      = Color(0xFF1C1C1E),
+    secondaryContainer = Color(0xFF1E3A5F),
+    onSecondaryContainer = Color(0xFFCCE8FF),
 
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    tertiary         = Color(0xFF81C784), // Soft green for success states
+    onTertiary       = Color(0xFF1C1C1E),
+    tertiaryContainer  = Color(0xFF1B3A1E),
+    onTertiaryContainer = Color(0xFFC8E6C9),
+
+    error            = Color(0xFFFF6B6B),
+    errorContainer   = Color(0xFF3D1515),
+    onError          = Color(0xFF1C1C1E),
+    onErrorContainer = Color(0xFFFFCDD2),
+
+    background       = Color(0xFF1C1C1E), // App-wide background
+    onBackground     = Color(0xFFF5F5F5),
+
+    surface          = Color(0xFF242426), // Card surfaces
+    onSurface        = Color(0xFFF5F5F5),
+    surfaceVariant   = Color(0xFF2C2C2E), // Slightly lighter surface
+    onSurfaceVariant = Color(0xFFAAAAAA), // Muted text
+
+    outline          = Color(0xFF3A3A3C), // Borders and dividers
+    outlineVariant   = Color(0xFF2C2C2E),
+
+    inverseSurface   = Color(0xFFF5F5F5),
+    inverseOnSurface = Color(0xFF1C1C1E),
 )
 
 @Composable
 fun AuthTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = EngifixDarkColorScheme,
         typography = Typography,
         content = content
     )

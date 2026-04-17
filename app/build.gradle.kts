@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.compose.animation.core.lint)
     implementation(libs.firebase.auth)
     implementation(libs.androidx.credentials)
@@ -90,7 +91,7 @@ dependencies {
     // https://mvnrepository.com/artifact/io.coil-kt.coil3/coil-compose
 
 
-    implementation("androidx.hilt:hilt-navigation-compose:1.0.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
 
@@ -124,4 +125,21 @@ dependencies {
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // Shimmer loading skeleton effect
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.3.0")
+
+    // Room local database (2.7+ required for Kotlin 2.1 metadata compatibility)
+    val roomVersion = "2.7.0"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+
+    // AndroidX Browser (Chrome Custom Tabs for opening URLs)
+    implementation("androidx.browser:browser:1.8.0")
+
+    // DataStore Preferences (stores last-synced JSON version)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Jsoup — HTML parser for client-side scraping
+    implementation("org.jsoup:jsoup:1.17.2")
 }
