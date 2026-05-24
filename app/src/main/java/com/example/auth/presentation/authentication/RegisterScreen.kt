@@ -18,18 +18,22 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -111,14 +115,16 @@ fun RegisterScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF18181C))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 20.dp)
         ) {
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(26.dp))
 
             IconButton(
                 onClick = { navController.navigate("first_screen") },
@@ -127,47 +133,47 @@ fun RegisterScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.White
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
             Text(
                 text = "Enter contact details",
                 fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                color = Color.White,
+                fontSize = 22.sp,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(18.dp))
 
             // EMAIL
             Text(
                 text = "Email",
-                color = Color(0xFFD7D7D7),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
             )
             TextField(
                 value = authViewModel.email,
                 onValueChange = { authViewModel.email = it },
-                placeholder = { Text("you@example.com", color = Color(0x88FFFFFF)) },
+                placeholder = { Text("you@example.com", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 colors = textFieldColors(),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        Color(0xFF22232D),
-                        shape = RoundedCornerShape(20.dp)
+                        MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(8.dp)
                     )
                     .padding(start = 8.dp, end = 8.dp)
             )
             Text(
                 text = emailError ?: "",
-                color = Color(0xFFEF5350),
+                color = MaterialTheme.colorScheme.error,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
             )
@@ -177,7 +183,7 @@ fun RegisterScreen(
             // PHONE (optional)
             Text(
                 text = "Phone (optional)",
-                color = Color(0xFFD7D7D7),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
             )
@@ -186,12 +192,12 @@ fun RegisterScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF22232D), shape = RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
                     text = "IN +91",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     modifier = Modifier.padding(horizontal = 4.dp)
@@ -200,7 +206,7 @@ fun RegisterScreen(
                 TextField(
                     value = authViewModel.phoneNumber,
                     onValueChange = { authViewModel.phoneNumber = it },
-                    placeholder = { Text("10-digit phone number", color = Color(0x88FFFFFF)) },
+                    placeholder = { Text("10-digit phone number", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                     colors = textFieldColors(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -212,12 +218,12 @@ fun RegisterScreen(
 
             Text(
                 text = phoneError ?: "",
-                color = Color(0xFFEF5350),
+                color = MaterialTheme.colorScheme.error,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
             )
 
-            Spacer(Modifier.height(17.dp))
+            Spacer(Modifier.height(12.dp))
 
             ButtonEx(
                 text = "Next",
@@ -255,7 +261,7 @@ fun RegisterScreen(
                         navController.navigate("ask_name_screen")
                     }
                 },
-                containerColor = Color(0xFF5865F2),
+                containerColor = MaterialTheme.colorScheme.primary,
                 textFontWeight = FontWeight.Medium
             )
 
@@ -284,9 +290,9 @@ fun GoogleButton() {
         shape = androidx.compose.foundation.shape.RoundedCornerShape(25.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Companion.Transparent,
-            contentColor = Color.Companion.White
+            contentColor = MaterialTheme.colorScheme.onSurface
         ),
-        border = BorderStroke(1.dp, Color(0xFF22232D))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             verticalAlignment = Alignment.Companion.CenterVertically,
@@ -297,7 +303,7 @@ fun GoogleButton() {
                 modifier = Modifier.Companion
                     .size(20.dp)
                     .background(
-                        Color.Companion.White,
+                        MaterialTheme.colorScheme.surface,
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Companion.Center
@@ -314,7 +320,7 @@ fun GoogleButton() {
 
             Text(
                 "Continue with Google",
-                color = Color.Companion.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Companion.Medium
             )
@@ -341,7 +347,7 @@ fun TabSelector(
             .fillMaxWidth()
             .height(48.dp)
             .background(
-                Color(0xFF22232D),
+                MaterialTheme.colorScheme.surface,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
             )
             .padding(4.dp)
@@ -367,7 +373,7 @@ fun TabSelector(
                             modifier = Modifier.Companion
                                 .fillMaxSize()
                                 .background(
-                                    Color(0xFF4343D7),
+                                    MaterialTheme.colorScheme.primary,
                                     shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
                                 )
                                 .zIndex(0f)
@@ -378,7 +384,7 @@ fun TabSelector(
                         text = title,
                         fontWeight = FontWeight.Companion.Medium,
                         fontSize = 16.sp,
-                        color = if (selectedTab == i) Color.Companion.White else Color(0xFFB3B3B3),
+                        color = if (selectedTab == i) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.Companion.zIndex(1f)
                     )
                 }
@@ -390,46 +396,46 @@ fun TabSelector(
 // Cleaner TextField colors for dark theme: for TextField
 @Composable
 fun textFieldColors() = TextFieldDefaults.colors(
-    focusedTextColor = Color.Companion.White,
-    unfocusedTextColor = Color.Companion.White,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
     disabledTextColor = Color.Companion.Gray,
-    errorTextColor = Color.Companion.Red,
+    errorTextColor = MaterialTheme.colorScheme.error,
     focusedContainerColor = Color.Companion.Transparent,
     unfocusedContainerColor = Color.Companion.Transparent,
     disabledContainerColor = Color.Companion.Transparent,
     errorContainerColor = Color.Companion.Transparent,
-    cursorColor = Color.Companion.White,
-    errorCursorColor = Color.Companion.Red,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    errorCursorColor = MaterialTheme.colorScheme.error,
     focusedIndicatorColor = Color.Companion.Transparent,
     unfocusedIndicatorColor = Color.Companion.Transparent,
     disabledIndicatorColor = Color.Companion.Transparent,
     errorIndicatorColor = Color.Companion.Transparent,
-    focusedLeadingIconColor = Color.Companion.White,
-    unfocusedLeadingIconColor = Color.Companion.White.copy(alpha = 0.7f),
+    focusedLeadingIconColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledLeadingIconColor = Color.Companion.Gray,
-    errorLeadingIconColor = Color.Companion.Red,
-    focusedTrailingIconColor = Color.Companion.White,
-    unfocusedTrailingIconColor = Color.Companion.White.copy(alpha = 0.7f),
+    errorLeadingIconColor = MaterialTheme.colorScheme.error,
+    focusedTrailingIconColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledTrailingIconColor = Color.Companion.Gray,
-    errorTrailingIconColor = Color.Companion.Red,
-    focusedLabelColor = Color.Companion.White,
-    unfocusedLabelColor = Color.Companion.White.copy(alpha = 0.7f),
+    errorTrailingIconColor = MaterialTheme.colorScheme.error,
+    focusedLabelColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledLabelColor = Color.Companion.Gray,
-    errorLabelColor = Color.Companion.Red,
-    focusedPlaceholderColor = Color.Companion.White.copy(alpha = 0.7f),
-    unfocusedPlaceholderColor = Color.Companion.White.copy(alpha = 0.7f),
+    errorLabelColor = MaterialTheme.colorScheme.error,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledPlaceholderColor = Color.Companion.Gray,
-    errorPlaceholderColor = Color.Companion.Red,
-    focusedSupportingTextColor = Color.Companion.White,
-    unfocusedSupportingTextColor = Color.Companion.White.copy(alpha = 0.7f),
+    errorPlaceholderColor = MaterialTheme.colorScheme.error,
+    focusedSupportingTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledSupportingTextColor = Color.Companion.Gray,
-    errorSupportingTextColor = Color.Companion.Red,
-    focusedPrefixColor = Color.Companion.White,
-    unfocusedPrefixColor = Color.Companion.White.copy(alpha = 0.7f),
+    errorSupportingTextColor = MaterialTheme.colorScheme.error,
+    focusedPrefixColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledPrefixColor = Color.Companion.Gray,
-    errorPrefixColor = Color.Companion.Red,
-    focusedSuffixColor = Color.Companion.White,
-    unfocusedSuffixColor = Color.Companion.White.copy(alpha = 0.7f),
+    errorPrefixColor = MaterialTheme.colorScheme.error,
+    focusedSuffixColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
     disabledSuffixColor = Color.Companion.Gray,
-    errorSuffixColor = Color.Companion.Red,
+    errorSuffixColor = MaterialTheme.colorScheme.error,
 )

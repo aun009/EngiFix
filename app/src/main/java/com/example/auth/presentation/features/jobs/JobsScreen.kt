@@ -13,7 +13,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.auth.data.local.entity.JobEntity
+import com.example.auth.presentation.components.EngiFixBackground
+import com.example.auth.presentation.components.IconTile
 import com.valentinilk.shimmer.shimmer
 
 // ─── Badge config ─────────────────────────────────────────────────────────────
@@ -39,7 +46,7 @@ private fun JobEntity.badgeStyle(): BadgeStyle {
     return when (category) {
         "Internship" -> BadgeStyle("Internship", Color(0xFF00B894).copy(0.15f), Color(0xFF00B894))
         "Trainee"    -> BadgeStyle("Trainee",   Color(0xFFFDAB33).copy(0.18f), Color(0xFFE58C00))
-        "Fresher"    -> BadgeStyle("Fresher",   Color(0xFFA29BFE).copy(0.2f),  Color(0xFF6C5CE7))
+        "Fresher"    -> BadgeStyle("Fresher",   Color(0xFFE3ECD9),             Color(0xFF5E7250))
         "Part-time"  -> BadgeStyle("Part-time", Color(0xFFFF6B81).copy(0.15f), Color(0xFFD63031))
         else         -> BadgeStyle("Full-time", cs.primaryContainer,           cs.onPrimaryContainer)
     }
@@ -47,9 +54,9 @@ private fun JobEntity.badgeStyle(): BadgeStyle {
 
 // Avatar color — deterministic per company
 private val AVATAR_PALETTE = listOf(
-    Color(0xFF6C5CE7), Color(0xFF00B894), Color(0xFF0984E3),
-    Color(0xFFE17055), Color(0xFFFDAB33), Color(0xFFFF4757),
-    Color(0xFF00CEC9), Color(0xFFA29BFE),
+    Color(0xFFC75F3A), Color(0xFF287C7A), Color(0xFF5E7250),
+    Color(0xFFE17055), Color(0xFFB88A2A), Color(0xFFB3261E),
+    Color(0xFF2E8B8B), Color(0xFF6F7C4E),
 )
 private fun avatarColor(company: String) =
     AVATAR_PALETTE[(company.firstOrNull()?.code ?: 0) % AVATAR_PALETTE.size]
@@ -62,15 +69,13 @@ fun JobsScreen(onBackClick: () -> Unit = {}) {
     val uiState by viewModel.uiState.collectAsState()
     val filter  by viewModel.filter.collectAsState()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        TopBar(uiState = uiState, onRefresh = viewModel::refresh)
-        FilterSection(filter = filter, viewModel = viewModel)
-        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-        ContentArea(uiState = uiState, filter = filter, viewModel = viewModel)
+    EngiFixBackground {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopBar(uiState = uiState, onRefresh = viewModel::refresh)
+            FilterSection(filter = filter, viewModel = viewModel)
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            ContentArea(uiState = uiState, filter = filter, viewModel = viewModel)
+        }
     }
 }
 
@@ -87,15 +92,14 @@ private fun TopBar(uiState: JobsUiState, onRefresh: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Opportunities",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 26.sp,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onBackground,
-                letterSpacing = (-0.5).sp
             )
             val sub = when (uiState) {
-                is JobsUiState.Success  -> "${uiState.jobs.size} active listings"
-                is JobsUiState.Scraping -> "Fetching fresh listings…"
-                else                    -> "Jobs & Internships"
+                is JobsUiState.Success  -> "${uiState.jobs.size} roles matched to your filters"
+                is JobsUiState.Scraping -> "Refreshing the opportunity feed"
+                else                    -> "Jobs, internships, and fresher roles"
             }
             Text(
                 text = sub,
@@ -105,7 +109,7 @@ private fun TopBar(uiState: JobsUiState, onRefresh: () -> Unit) {
             )
         }
         IconButton(onClick = onRefresh) {
-            Icon(Icons.Default.Refresh, "Refresh", tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.Refresh, "Refresh opportunities", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -163,7 +167,7 @@ private fun FilterRow(
                     tween(160), label = "cbg"
                 )
                 val chipText by animateColorAsState(
-                    if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     tween(160), label = "ctx"
                 )
                 Surface(
@@ -223,7 +227,7 @@ private fun ContentArea(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("⚠️", style = MaterialTheme.typography.displaySmall)
+                    IconTile(icon = Icons.Default.ErrorOutline, tint = MaterialTheme.colorScheme.error)
                     Text(uiState.message, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
                     Button(onClick = viewModel::refresh) { Text("Retry") }
                 }
@@ -245,7 +249,7 @@ private fun JobCard(job: JobEntity) {
             if (job.applyUrl.isNotBlank())
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(job.applyUrl)))
         },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
@@ -253,7 +257,7 @@ private fun JobCard(job: JobEntity) {
             .border(
                 width = 1.dp,
                 color = MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(8.dp)
             )
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -266,21 +270,7 @@ private fun JobCard(job: JobEntity) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                // Company avatar
-                Box(
-                    modifier = Modifier
-                        .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(accent.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = job.company.take(1).uppercase(),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = accent
-                    )
-                }
+                IconTile(icon = Icons.Default.Business, tint = accent)
 
                 Column(modifier = Modifier.weight(1f)) {
                     // Company + badge
@@ -297,7 +287,7 @@ private fun JobCard(job: JobEntity) {
                         Spacer(Modifier.width(8.dp))
                         // Category badge
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = badge.bg
                         ) {
                             Text(
@@ -345,18 +335,26 @@ private fun JobCard(job: JobEntity) {
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outlineVariant
                 )
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.06f))
                         .padding(horizontal = 16.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.CenterEnd
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Apply Now →",
+                        text = "Apply now",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -367,7 +365,7 @@ private fun JobCard(job: JobEntity) {
 @Composable
 private fun MetaTag(text: String) {
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Text(
@@ -399,14 +397,15 @@ private fun ScrapingState() {
                 strokeWidth = 3.dp,
                 color = MaterialTheme.colorScheme.primary
             )
+            IconTile(icon = Icons.Default.WorkOutline, tint = MaterialTheme.colorScheme.primary)
             Text(
-                text = "Fetching jobs from TheJobCompany…",
+                text = "Preparing your opportunity feed",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "This takes about 30 seconds on first launch.\nYour data is cached after.",
+                text = "First refresh can take a moment. After that, listings are cached locally.",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 18.sp
@@ -419,7 +418,7 @@ private fun ScrapingState() {
                             .fillMaxWidth()
                             .height(110.dp)
                             .shimmer()
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                     )
                 }
@@ -435,7 +434,7 @@ private fun EmptyFilter(filter: JobFilter) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("🔍", fontSize = 40.sp)
+            IconTile(icon = Icons.Default.SearchOff, tint = MaterialTheme.colorScheme.primary)
             Text(
                 text = "No ${filter.type} roles\nfor batch ${filter.batch}",
                 fontSize = 15.sp,

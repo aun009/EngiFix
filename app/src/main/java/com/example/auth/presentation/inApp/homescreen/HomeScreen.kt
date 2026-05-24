@@ -2,6 +2,12 @@ package com.example.auth.presentation.inApp.homescreen
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -9,17 +15,26 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.auth.presentation.animation.rememberMotionPolicy
+import com.example.auth.presentation.components.EngiFixBackground
+import com.example.auth.presentation.components.Eyebrow
 import com.example.auth.presentation.components.TipCardEx
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -37,6 +52,17 @@ fun HomeScreen(navController: NavHostController) {
 @Composable
 fun TopAndMidHomeScreen(navController: NavHostController) {
     val scrollState = rememberScrollState()
+    val motion = rememberMotionPolicy()
+    var visible by remember { mutableStateOf(false) }
+    val heroLift by animateFloatAsState(
+        targetValue = if (scrollState.value > 16 && motion.enabled) -10f else 0f,
+        animationSpec = tween(motion.fast),
+        label = "home_hero_lift"
+    )
+
+    LaunchedEffect(Unit) {
+        visible = true
+    }
 
     var formattedTime by remember { mutableStateOf("") }
     var formattedDay  by remember { mutableStateOf("") }
@@ -70,150 +96,172 @@ fun TopAndMidHomeScreen(navController: NavHostController) {
         else      -> "Good night"
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF18181C))
-            .verticalScroll(scrollState)
-    ) {
-        // ── Hero Banner ───────────────────────────────────────────────────────
-        Box(
+    EngiFixBackground {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF1E1E22))
-                .padding(horizontal = 20.dp)
-                .padding(top = 48.dp, bottom = 32.dp)
+                .fillMaxSize()
+                .verticalScroll(scrollState)
         ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            AnimatedVisibility(
+                visible = visible,
+                enter = fadeIn(tween(motion.duration(420))) +
+                        slideInVertically(
+                            animationSpec = tween(motion.duration(520), easing = FastOutSlowInEasing),
+                            initialOffsetY = { it / 8 }
+                        )
+            ) {
+                Column {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .graphicsLayer { translationY = heroLift }
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    MaterialTheme.colorScheme.surface,
+                                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.74f)
+                                )
+                            )
+                        )
+                        .padding(horizontal = 18.dp)
+                        .padding(top = 28.dp, bottom = 18.dp)
                 ) {
                     Column {
-                        Text(
-                            text = if (firstName.isNotEmpty()) "$greeting, $firstName 👋"
-                                   else "$greeting 👋",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 26.sp,
-                            color = Color.White
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "Let's build something great today",
-                            fontSize = 14.sp,
-                            color = Color(0xFFAAAAAA)
-                        )
-                    }
-                    Box {
-                        IconButton(onClick = {}) {
-                            Icon(
-                                Icons.Default.Notifications, null,
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
+                        Eyebrow(text = "CAREER OS")
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (firstName.isNotEmpty()) {
+                                        "$greeting, ${firstName.take(18)}"
+                                    } else {
+                                        greeting
+                                    },
+                                    style = MaterialTheme.typography.headlineLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = "Choose the next move. The app keeps up with you.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Box {
+                                IconButton(onClick = {}) {
+                                    Icon(
+                                        Icons.Default.Notifications,
+                                        contentDescription = "Notifications",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = (-1).dp, y = 8.dp)
+                                )
+                            }
                         }
-                        Box(
+
+                        Spacer(Modifier.height(24.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.background.copy(alpha = 0.44f),
                             modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFFF6B6B))
-                                .align(Alignment.TopEnd)
-                                .offset(x = 0.dp, y = 6.dp)
-                        )
+                                .fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = formattedTime.ifBlank { "--:--" },
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = formattedDay.ifBlank { "Today" },
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(28.dp))
+                Text(
+                    text = "Your next move",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
 
-                // Live clock
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color.White.copy(alpha = 0.08f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = formattedTime,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = formattedDay,
-                                fontSize = 13.sp,
-                                color = Color(0xFFBBBBFF)
-                            )
-                        }
-                        Text(text = "🗓️", fontSize = 32.sp)
-                    }
+                TipCardEx(
+                    title = "Jobs & Internships",
+                    description = "Fresh roles, filtered for early-career engineers",
+                    icon = Icons.Default.Work,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    accentColor = Color(0xFF7BA7A5)
+                ) { navController.navigate("internships") }
+
+                TipCardEx(
+                    title = "Contests",
+                    description = "Today and tomorrow rounds, ready to join",
+                    icon = Icons.Default.EmojiEvents,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    accentColor = MaterialTheme.colorScheme.primary
+                ) { navController.navigate("ui") }
+
+                TipCardEx(
+                    title = "Mentorship",
+                    description = "Book focused guidance for interviews and projects",
+                    icon = Icons.Default.School,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    accentColor = Color(0xFFA7B894)
+                ) { navController.navigate("mentor") }
+
+                TipCardEx(
+                    title = "Peer Network",
+                    description = "Find students by college, branch, skills, and goals",
+                    icon = Icons.Default.Groups,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    accentColor = Color(0xFF8E6FBD)
+                ) { navController.navigate("connect") }
+
+                TipCardEx(
+                    title = "Canvas",
+                    description = "Sketch ideas, flows, and project diagrams on a canvas",
+                    icon = Icons.Default.AccountTree,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    accentColor = Color(0xFFFFC857)
+                ) { navController.navigate("project_canvas") }
+
+                Spacer(Modifier.height(24.dp))
                 }
             }
         }
-
-        // ── Feature Cards ─────────────────────────────────────────────────────
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "Explore",
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
-        TipCardEx(
-            title = "Jobs & Internships",
-            description = "Discover the latest openings tailored for you",
-            icon = "💼",
-            backgroundColor = Color(0xFF242426),
-            accentColor = Color(0xFF4DABF7)
-        ) { navController.navigate("internships") }
-
-        TipCardEx(
-            title = "Contests",
-            description = "Today & Tomorrow's coding battles — don't miss out",
-            icon = "🏆",
-            backgroundColor = Color(0xFF242426),
-            accentColor = Color(0xFFFF9F43)
-        ) { navController.navigate("ui") }
-
-        TipCardEx(
-            title = "Mentorship",
-            description = "1:1 guidance from top engineers at FAANG & beyond",
-            icon = "🎯",
-            backgroundColor = Color(0xFF242426),
-            accentColor = Color(0xFF6C5CE7)
-        ) { navController.navigate("mentor") }
-
-        // ── NEW: Student Toolkit card ─────────────────────────────────────────
-        TipCardEx(
-            title = "Student Toolkit",
-            description = "30+ essential sites — DSA, resumes, interviews & more",
-            icon = "🛠️",
-            backgroundColor = Color(0xFF242426),
-            accentColor = Color(0xFF00B894)
-        ) { navController.navigate("toolkit") }
-
-        // ── NEW: Cognitive Aptitude Game ──────────────────────────────────────
-        TipCardEx(
-            title = "Cognitive Assessment",
-            description = "Test your numerical reasoning with fast-paced equation puzzles",
-            icon = "🧮",
-            backgroundColor = Color(0xFF242426),
-            accentColor = Color(0xFFFFB800)
-        ) { navController.navigate("game") }
-
-        Spacer(Modifier.height(24.dp))
     }
 }
-
-@RequiresApi(Build.VERSION_CODES.O)
-private fun getCurrentDateTime(): LocalDateTime = LocalDateTime.now()

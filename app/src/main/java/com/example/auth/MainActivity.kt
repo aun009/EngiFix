@@ -10,26 +10,30 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.SentimentVeryDissatisfied
-import androidx.compose.material.icons.filled.SentimentVeryDissatisfied
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -50,12 +54,15 @@ import com.example.auth.presentation.features.aptitude.AptitudeGameScreen
 import com.example.auth.presentation.features.jobs.JobsScreen
 import com.example.auth.presentation.features.mentorship.MentorDetailScreen
 import com.example.auth.presentation.features.mentorship.MentorshipScreen
+import com.example.auth.presentation.features.project.ProjectCanvasScreen
 import com.example.auth.presentation.features.sheet.ExploreSheetScreen
 import com.example.auth.presentation.features.sheet.SheetDetailScreen
-import com.example.auth.presentation.features.toolkit.ToolkitScreen
 import com.example.auth.presentation.inApp.homescreen.HomeScreen
 import com.example.auth.presentation.inApp.profilescreen.ProfileScreen
 import com.example.auth.presentation.features.resume.ResumeRoastScreen
+import com.example.auth.presentation.animation.EngiFixIntroOverlay
+import com.example.auth.presentation.animation.rememberMotionPolicy
+import com.example.auth.presentation.inApp.profilescreen.ConnectScreen
 import com.example.auth.ui.theme.AuthTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -70,8 +77,8 @@ private data class BottomTab(
 
 private val bottomTabs = listOf(
     BottomTab("home",         "Home",    Icons.Filled.Home,                    Icons.Outlined.Home),
-    BottomTab("sheets",       "Sheets",  Icons.Filled.MenuBook,                Icons.Outlined.MenuBook),
-    BottomTab("resume_roast", "Roast",   Icons.Filled.SentimentVeryDissatisfied, Icons.Outlined.SentimentVeryDissatisfied),
+    BottomTab("sheets",       "Sheets",  Icons.AutoMirrored.Filled.MenuBook,   Icons.AutoMirrored.Outlined.MenuBook),
+    BottomTab("resume_roast", "Insights", Icons.Filled.Description,             Icons.Outlined.Description),
     BottomTab("profile",      "Profile", Icons.Filled.Person,                  Icons.Outlined.Person),
 )
 
@@ -107,123 +114,142 @@ class MainActivity : ComponentActivity() {
                 // Show bottom bar only for the 4 main tabs
                 val showBottomBar = currentRoute in bottomTabs.map { it.route }
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.background,
-                    bottomBar = {
-                        if (showBottomBar) {
-                            AppBottomNav(
-                                currentRoute = currentRoute,
-                                onTabSelected = { route ->
-                                    navController.navigate(route) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            saveState = true
+                Box(Modifier.fillMaxSize()) {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = MaterialTheme.colorScheme.background,
+                        bottomBar = {
+                            if (showBottomBar) {
+                                AppBottomNav(
+                                    currentRoute = currentRoute,
+                                    onTabSelected = { route ->
+                                        if (route != currentRoute) {
+                                            navController.navigate(route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
                                         }
-                                        launchSingleTop = true
-                                        restoreState = true
+                                    }
+                                )
+                            }
+                        }
+                    ) { paddingValues ->
+                        Box(modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                        ) {
+                            NavHost(
+                                navController = navController,
+                                startDestination = "first_screen"
+                            ) {
+                                // ── Auth flow ──────────────────────────────
+                                composable("first_screen") {
+                                    FirstScreen(navController)
+                                }
+                                composable("register_screen") {
+                                    RegisterScreen(navController, authViewModel)
+                                }
+                                composable("login_screen") {
+                                    LoginScreen(navController, authViewModel)
+                                }
+                                composable("ask_name_screen") {
+                                    AskFirstName(navController, authViewModel)
+                                }
+                                composable("username_pass_screen") {
+                                    UserNameAndPassScreen(navController, authViewModel)
+                                }
+
+                                // ── Main tabs (bottom bar visible) ─────────
+                                composable("home") {
+                                    HomeScreen(navController)
+                                }
+                                composable("sheets") {
+                                    ExploreSheetScreen(
+                                        onSheetClick = { sheetId ->
+                                            navController.navigate("sheet_detail/$sheetId")
+                                        }
+                                    )
+                                }
+                                composable("resume_roast") {
+                                    ResumeRoastScreen(navController)
+                                }
+                                composable("profile") {
+                                    ProfileScreen(
+                                        navController = navController,
+                                        viewModel = authViewModel,
+                                        onNavigateToLogin = {
+                                            navController.navigate("first_screen") {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    inclusive = true
+                                                }
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    )
+                                }
+                                composable("connect") {
+                                    ConnectScreen(onBackClick = { navController.navigateUp() })
+                                }
+
+                                // ── Detail screens (bottom bar hidden) ─────
+                                composable("sheet_detail/{sheetId}") { backStackEntry ->
+                                    val sheetId = backStackEntry.arguments
+                                        ?.getString("sheetId") ?: return@composable
+                                    SheetDetailScreen(
+                                        sheetId = sheetId,
+                                        onBackClick = { navController.navigateUp() }
+                                    )
+                                }
+                                composable("mentor_detail") {
+                                    val mentor = navController.previousBackStackEntry
+                                        ?.savedStateHandle?.get<Mentor>("selected_mentor")
+                                    mentor?.let {
+                                        MentorDetailScreen(
+                                            mentor = it,
+                                            onBackClick = { navController.navigateUp() },
+                                            onGetAccessClick = { navController.navigateUp() },
+                                            razorpayKeyId = "YOUR_RAZORPAY_KEY_ID"
+                                        )
                                     }
                                 }
-                            )
-                        }
-                    }
-                ) { paddingValues ->
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                    ) {
-                        NavHost(
-                            navController = navController,
-                            startDestination = "first_screen"
-                        ) {
-                            // ── Auth flow ──────────────────────────────
-                            composable("first_screen") {
-                                FirstScreen(navController)
-                            }
-                            composable("register_screen") {
-                                RegisterScreen(navController, authViewModel)
-                            }
-                            composable("login_screen") {
-                                LoginScreen(navController, authViewModel)
-                            }
-                            composable("ask_name_screen") {
-                                AskFirstName(navController, authViewModel)
-                            }
-                            composable("username_pass_screen") {
-                                UserNameAndPassScreen(navController, authViewModel)
-                            }
 
-                            // ── Main tabs (bottom bar visible) ─────────
-                            composable("home") {
-                                HomeScreen(navController)
-                            }
-                            composable("sheets") {
-                                ExploreSheetScreen(
-                                    onSheetClick = { sheetId ->
-                                        navController.navigate("sheet_detail/$sheetId")
-                                    }
-                                )
-                            }
-                            composable("resume_roast") {
-                                ResumeRoastScreen(navController)
-                            }
-                            composable("profile") {
-                                ProfileScreen(
-                                    navController = navController,
-                                    viewModel = authViewModel
-                                )
-                            }
-
-                            // ── Detail screens (bottom bar hidden) ─────
-                            composable("sheet_detail/{sheetId}") { backStackEntry ->
-                                val sheetId = backStackEntry.arguments
-                                    ?.getString("sheetId") ?: return@composable
-                                SheetDetailScreen(
-                                    sheetId = sheetId,
-                                    onBackClick = { navController.navigateUp() }
-                                )
-                            }
-                            composable("mentor_detail") {
-                                val mentor = navController.previousBackStackEntry
-                                    ?.savedStateHandle?.get<Mentor>("selected_mentor")
-                                mentor?.let {
-                                    MentorDetailScreen(
-                                        mentor = it,
+                                // ── Feature screens (navigated from home cards, bottom bar hidden) ──
+                                composable("internships") {
+                                    JobsScreen(onBackClick = { navController.navigateUp() })
+                                }
+                                composable("ui") {
+                                    ContestScreen(onBackClick = { navController.navigateUp() })
+                                }
+                                composable("mentor") {
+                                    MentorshipScreen(
                                         onBackClick = { navController.navigateUp() },
-                                        onGetAccessClick = { navController.navigateUp() },
-                                        razorpayKeyId = "YOUR_RAZORPAY_KEY_ID"
+                                        onMentorClick = { mentor ->
+                                            navController.currentBackStackEntry
+                                                ?.savedStateHandle?.set("selected_mentor", mentor)
+                                            navController.navigate("mentor_detail")
+                                        }
+                                    )
+                                }
+                                composable("project_canvas") {
+                                    ProjectCanvasScreen(onBackClick = { navController.navigateUp() })
+                                }
+                                composable("game") {
+                                    AptitudeGameScreen(
+                                        onBackClick = { navController.navigateUp() }
                                     )
                                 }
                             }
-
-                            // ── Feature screens (navigated from home cards, bottom bar hidden) ──
-                            composable("internships") {
-                                JobsScreen(onBackClick = { navController.navigateUp() })
-                            }
-                            composable("ui") {
-                                ContestScreen(onBackClick = { navController.navigateUp() })
-                            }
-                            composable("mentor") {
-                                MentorshipScreen(
-                                    onBackClick = { navController.navigateUp() },
-                                    onMentorClick = { mentor ->
-                                        navController.currentBackStackEntry
-                                            ?.savedStateHandle?.set("selected_mentor", mentor)
-                                        navController.navigate("mentor_detail")
-                                    }
-                                )
-                            }
-                            composable("game") {
-                                AptitudeGameScreen(
-                                    onBackClick = { navController.navigateUp() }
-                                )
-                            }
-                            composable("toolkit") {
-                                ToolkitScreen(
-                                    onBackClick = { navController.navigateUp() }
-                                )
-                            }
                         }
                     }
+
+                    EngiFixIntroOverlay(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(10f)
+                    )
                 }
             }
         }
@@ -253,17 +279,32 @@ private fun AppBottomNav(
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp
+        tonalElevation = 3.dp
     ) {
         bottomTabs.forEach { tab ->
             val isSelected = currentRoute == tab.route
+            val motion = rememberMotionPolicy()
+            val iconScale by animateFloatAsState(
+                targetValue = if (isSelected) 1.12f else 1f,
+                animationSpec = tween(motion.fast),
+                label = "${tab.route}_icon_scale"
+            )
+            val indicatorAlpha by animateFloatAsState(
+                targetValue = if (isSelected) 1f else 0.72f,
+                animationSpec = tween(motion.fast),
+                label = "${tab.route}_indicator_alpha"
+            )
             NavigationBarItem(
                 selected = isSelected,
                 onClick = { onTabSelected(tab.route) },
                 icon = {
                     Icon(
                         imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                        contentDescription = tab.label
+                        contentDescription = tab.label,
+                        modifier = Modifier.graphicsLayer {
+                            scaleX = iconScale
+                            scaleY = iconScale
+                        }
                     )
                 },
                 label = {
@@ -278,7 +319,9 @@ private fun AppBottomNav(
                     selectedTextColor = MaterialTheme.colorScheme.primary,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(
+                        alpha = indicatorAlpha
+                    )
                 )
             )
         }

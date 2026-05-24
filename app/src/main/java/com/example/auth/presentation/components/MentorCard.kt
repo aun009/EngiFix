@@ -1,18 +1,18 @@
 package com.example.auth.presentation.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -32,15 +32,15 @@ fun MentorCardEx(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF242426)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3A3A3C)),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 8.dp,
-            pressedElevation = 4.dp
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp
         )
     ) {
         Column(
@@ -53,21 +53,7 @@ fun MentorCardEx(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Placeholder for profile image
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF3A3A3C)), // Minimal profile circle
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = name.take(1),
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                IconTile(icon = Icons.Default.Person, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(58.dp))
 
                 Spacer(Modifier.width(16.dp))
 
@@ -77,13 +63,13 @@ fun MentorCardEx(
                             text = name,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = "Verified",
-                            tint = Color(0xFF1DA1F2),
+                            tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -100,12 +86,12 @@ fun MentorCardEx(
                             text = "$rating",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = " ($totalReviews reviews)",
                             fontSize = 14.sp,
-                            color = Color(0xFFAAAAAA)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -120,15 +106,15 @@ fun MentorCardEx(
             ) {
                 skills.take(3).forEach { skill ->
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF333333),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier
                     ) {
                         Text(
                             text = skill,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFFE0E0E0),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
                     }
@@ -142,7 +128,7 @@ fun MentorCardEx(
                 text = title,
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 22.sp
             )
 
@@ -151,7 +137,7 @@ fun MentorCardEx(
             // Description
             Text(
                 text = description,
-                color = Color(0xFFAAAAAA),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(bottom = 4.dp),
@@ -166,7 +152,7 @@ fun MentorCardEx(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(Color(0xFF3A3A3C)) // Solid simple divider
+                    .background(MaterialTheme.colorScheme.outlineVariant)
             )
 
             Spacer(Modifier.height(20.dp))
@@ -182,38 +168,37 @@ fun MentorCardEx(
                         text = price,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "Starts from",
                         fontSize = 12.sp,
-                        color = Color(0xFFAAAAAA)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .background(
-                            color = Color(0xFF3A3A3C), // Simple dark button
-                            shape = RoundedCornerShape(12.dp)
-                        )
+                Button(
+                    onClick = onClick,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(0.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)
                 ) {
-                    Button(
-                        onClick = onClick,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(0.dp),
-                        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 14.dp)
-                    ) {
-                        Text(
-                            text = "View Services",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Text(
+                        text = "View",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }

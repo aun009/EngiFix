@@ -36,7 +36,7 @@ private const val TAG = "SheetSyncManager"
  *  2. Try downloading dsa_sheets.json from GitHub Raw URL
  *  3. If download succeeds AND remote version > local → upsert into Room
  *  4. If download fails (no internet) → fall back to assets/dsa_sheets.json
- *  5. isCompleted data is NEVER touched — only new sheets/questions are inserted
+ *  5. isCompleted data is NEVER touched — content is updated in place
  * ──────────────────────────────────────────────────────────────────────────────
  */
 @Singleton
@@ -59,7 +59,12 @@ class SheetSyncManager @Inject constructor(
 
         Log.d(TAG, "Local version: $localVersion | DB sheets: $sheetCount")
 
-        // Try remote first
+        if (sheetCount == 0) {
+            Log.d(TAG, "DB empty — loading bundled sheets before remote refresh")
+            loadFromAssets()
+        }
+
+        // Try remote after the bundle is available so the UI is never blocked by the network.
         val remoteJson = tryDownload(remoteUrl)
 
         if (remoteJson != null) {
@@ -78,7 +83,7 @@ class SheetSyncManager @Inject constructor(
 
         // Fallback: assets (always works, offline)
         // Load from assets if we have no remote data AND (never synced before OR DB is wiped)
-        if (localVersion == 0 || sheetCount == 0) {
+        if (localVersion == 0 || dao.getSheetCount() == 0) {
             Log.d(TAG, "No internet / DB empty — loading from assets bundle")
             loadFromAssets()
         }
@@ -87,17 +92,21 @@ class SheetSyncManager @Inject constructor(
     // ── Private helpers ────────────────────────────────────────────────────────
 
     private fun tryDownload(url: String): String? {
+        var conn: HttpURLConnection? = null
         return try {
-            val conn = URL(url).openConnection() as HttpURLConnection
+            conn = URL(url).openConnection() as HttpURLConnection
             conn.connectTimeout = 8_000
             conn.readTimeout    = 15_000
             conn.requestMethod  = "GET"
+            conn.useCaches = false
             if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                conn.inputStream.bufferedReader().readText()
+                conn.inputStream.bufferedReader().use { it.readText() }
             } else null
         } catch (e: Exception) {
             Log.w(TAG, "Download failed: ${e.message}")
             null
+        } finally {
+            conn?.disconnect()
         }
     }
 
@@ -114,7 +123,7 @@ class SheetSyncManager @Inject constructor(
         try {
             val json = context.assets.open("dsa_sheets.json").bufferedReader().readText()
             val parsed = tryParse(json) ?: return
-            Log.d(TAG, "Loaded ${parsed.sheets.size} sheets from assets")
+            Log.d(TAG, "Loaded ${parsed.sheets.orEmpty().size} sheets from assets")
             upsertToRoom(parsed)
             saveLocalVersion(parsed.version)
         } catch (e: Exception) {
@@ -123,37 +132,46 @@ class SheetSyncManager @Inject constructor(
     }
 
     /**
-     * Inserts sheets and questions using INSERT OR IGNORE.
+     * Merges sheets and questions without replacing rows.
      * This means:
-     *   - New sheets/questions are added
-     *   - Existing questions keep their isCompleted value untouched ✅
+     *   - New sheets/questions are added.
+     *   - Existing titles, topics, difficulty and URLs are repaired.
+     *   - Existing questions keep their isCompleted value untouched.
      */
     private suspend fun upsertToRoom(file: SheetJsonFile) {
-        val sheets = file.sheets.map { s ->
+        val validSheets = file.sheets.orEmpty()
+            .filter { it.id.orEmpty().isNotBlank() && it.title.orEmpty().isNotBlank() }
+            .distinctBy { it.id.orEmpty().trim() }
+
+        val sheets = validSheets.map { s ->
             ExploreSheetEntity(
-                id             = s.id,
-                title          = s.title,
-                description    = s.description,
-                totalQuestions = s.totalQuestions,
-                category       = s.category
+                id             = s.id.orEmpty().trim(),
+                title          = s.title.orEmpty().trim(),
+                description    = s.description.orEmpty().trim(),
+                totalQuestions = s.questions.orEmpty().size.takeIf { it > 0 } ?: s.totalQuestions.coerceAtLeast(0),
+                category       = s.category.orEmpty().trim().ifBlank { "DSA" }
             )
         }
-        val questions = file.sheets.flatMap { s ->
-            s.questions.map { q ->
-                DsaQuestionEntity(
-                    id          = q.id,
-                    sheetId     = s.id,
-                    topic       = q.topic,
-                    title       = q.title,
-                    difficulty  = q.difficulty,
-                    problemUrl  = q.problemUrl
-                    // isCompleted defaults to false for new questions only
-                )
-            }
+        val questions = validSheets.flatMap { s ->
+            s.questions.orEmpty()
+                .filter { q -> q.id.orEmpty().isNotBlank() && q.title.orEmpty().isNotBlank() }
+                .distinctBy { q -> q.id.orEmpty().trim() }
+                .map { q ->
+                    DsaQuestionEntity(
+                        id          = q.id.orEmpty().trim(),
+                        sheetId     = s.id.orEmpty().trim(),
+                        topic       = q.topic.orEmpty().trim().ifBlank { "General" },
+                        title       = q.title.orEmpty().trim(),
+                        difficulty  = q.difficulty.orEmpty().trim().replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase() else it.toString()
+                        }.ifBlank { "Medium" },
+                        problemUrl  = q.problemUrl.orEmpty().trim()
+                        // isCompleted defaults to false for new questions only
+                    )
+                }
         }
 
-        dao.insertSheets(sheets)
-        dao.insertQuestions(questions)
+        dao.mergeSheetsAndQuestions(sheets, questions)
         Log.d(TAG, "Upserted ${sheets.size} sheets, ${questions.size} questions into Room")
     }
 

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
 
     alias(libs.plugins.android.application)
@@ -9,6 +11,16 @@ plugins {
     id ("dagger.hilt.android.plugin")
     id("kotlin-parcelize")
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use(::load)
+    }
+}
+
+fun String.asBuildConfigString(): String =
+    replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "com.example.auth"
@@ -22,10 +34,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY")
+            ?: System.getenv("GEMINI_API_KEY")
+            ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"${geminiApiKey.asBuildConfigString()}\"")
     }
 
     buildFeatures{
         viewBinding = true
+        buildConfig = true
     }
 
     buildTypes {
@@ -72,6 +89,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
     implementation(libs.firebase.firestore)
+    implementation("com.google.firebase:firebase-storage:22.0.1")
     implementation(libs.androidx.benchmark.common)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.volley)

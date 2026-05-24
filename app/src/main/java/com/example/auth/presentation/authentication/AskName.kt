@@ -7,18 +7,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,14 +38,16 @@ fun AskFirstName(
     Box(
         modifier = Modifier.Companion
             .fillMaxSize()
-            .background(Color(0xFF18181C))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier.Companion
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 20.dp)
         ) {
-            Spacer(Modifier.Companion.height(40.dp)) // Added more top padding
+            Spacer(Modifier.Companion.height(26.dp))
 
             // Back arrow icon (updated for AutoMirrored)
             IconButton(
@@ -52,35 +57,35 @@ fun AskFirstName(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.Companion.White
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
 
-            Spacer(Modifier.Companion.height(20.dp)) // Increased spacing
+            Spacer(Modifier.Companion.height(16.dp))
 
             // Title
             Text(
                 text = "What's your name?",
                 fontWeight = FontWeight.Companion.Bold,
-                fontSize = 24.sp,
-                color = Color.Companion.White,
+                fontSize = 22.sp,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
                     .padding(start = 8.dp),
                 textAlign = TextAlign.Companion.Center
             )
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(20.dp))
 
             // Tab Row with animation
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(12.dp))
 
 
             // Email input
             Text(
                 text = "Display Name",
-                color = Color(0xFFD7D7D7),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 modifier = Modifier.Companion.padding(start = 4.dp, bottom = 4.dp)
             )
@@ -88,17 +93,17 @@ fun AskFirstName(
             TextField(
                 value = authViewModel.displayName,
                 onValueChange = { authViewModel.displayName = it },
-                placeholder = { Text("Name", color = Color(0x88FFFFFF)) },
+                placeholder = { Text("Name", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 colors = textFieldColors(),
                 singleLine = true,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
-                    .background(Color(0xFF22232D), shape = RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
                     .padding(start = 8.dp, end = 8.dp)
             )
 
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(24.dp))
 
             // Next Button
 //            Button(
@@ -115,7 +120,7 @@ fun AskFirstName(
             ButtonEx(
                 text = "Next",
                 onClick = { navController.navigate("username_pass_screen") },
-                containerColor = Color(0xFF5865F2),
+                containerColor = MaterialTheme.colorScheme.primary,
                 textFontWeight = FontWeight.Companion.Medium
             )
 

@@ -29,8 +29,8 @@ fun ContestCard(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -75,7 +75,7 @@ fun ContestCard(
                         colors = CardDefaults.cardColors(
                             containerColor = Color(0xFF4CAF50) // Green for running
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
                             text = "Time left: ${uiModel.remainingTimeFormatted}",
@@ -90,7 +90,7 @@ fun ContestCard(
                         colors = CardDefaults.cardColors(
                             containerColor = platformColor.copy(alpha = 0.1f)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
                             text = uiModel.formattedDuration,
@@ -185,11 +185,11 @@ fun DateSectionCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(
                 containerColor = sectionColor.copy(alpha = 0.15f)
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -201,7 +201,7 @@ fun DateSectionCard(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(iconColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {

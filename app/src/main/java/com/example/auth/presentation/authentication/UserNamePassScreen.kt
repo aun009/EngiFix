@@ -9,16 +9,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -27,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -51,14 +54,16 @@ fun UserNameAndPassScreen(
     Box(
         modifier = Modifier.Companion
             .fillMaxSize()
-            .background(Color(0xFF18181C))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier.Companion
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(horizontal = 20.dp)
         ) {
-            Spacer(Modifier.Companion.height(40.dp)) // Added more top padding
+            Spacer(Modifier.Companion.height(26.dp))
 
             // Back arrow icon (updated for AutoMirrored)
             IconButton(
@@ -68,48 +73,53 @@ fun UserNameAndPassScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color.Companion.White
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
 
-            Spacer(Modifier.Companion.height(20.dp)) // Increased spacing
+            Spacer(Modifier.Companion.height(16.dp))
 
             // Title
             Text(
                 text = "Next, Create an account",
                 fontWeight = FontWeight.Companion.Bold,
-                fontSize = 24.sp,
-                color = Color.Companion.White,
+                fontSize = 22.sp,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
                     .padding(start = 8.dp),
                 textAlign = TextAlign.Companion.Center
             )
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(18.dp))
 
             // Tab Row with animation
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(12.dp))
 
 
-            // Email input
+            // Username input
             Text(
-                text = "Email",
-                color = Color(0xFFD7D7D7),
+                text = "Username",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 modifier = Modifier.Companion.padding(start = 4.dp, bottom = 4.dp)
             )
 
             TextField(
                 value = authViewModel.userName,
-                onValueChange = { authViewModel.userName = it },
-                placeholder = { Text("Enter your email", color = Color(0x88FFFFFF)) },
+                onValueChange = { value ->
+                    authViewModel.userName = value
+                        .lowercase()
+                        .filter { it.isLetterOrDigit() || it == '_' || it == '.' }
+                        .take(20)
+                },
+                placeholder = { Text("choose_a_handle", color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 colors = textFieldColors(),
                 singleLine = true,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
-                    .background(Color(0xFF22232D), shape = RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
                     .padding(start = 8.dp, end = 8.dp)
             )
 
@@ -121,7 +131,7 @@ fun UserNameAndPassScreen(
                 placeholder = {
                     Text(
                         "Enter your password",
-                        color = Color(0x88FFFFFF),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 16.sp
                     )
                 },
@@ -131,7 +141,7 @@ fun UserNameAndPassScreen(
                         Icon(
                             imageVector = if (passwordVisible) Icons.Default.Close else Icons.Default.Done,
                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                            tint = Color(0xFFB3B3B3)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
@@ -140,14 +150,14 @@ fun UserNameAndPassScreen(
                 modifier = Modifier.Companion
                     .fillMaxWidth()
                     .background(
-                        Color(0xFF22232D),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                        MaterialTheme.colorScheme.surface,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                     )
                     .padding(horizontal = 4.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Companion.Password)
             )
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(24.dp))
 
             // Next Button
 //            Button(
@@ -166,15 +176,15 @@ fun UserNameAndPassScreen(
                 onClick = {
                     Log.d("AuthDebug", "SignUp button clicked")
 
-                    Log.d("AuthDebug", "Username: ${authViewModel.userName}")
-                    Log.d("AuthDebug", "Password: ${authViewModel.passwordSignUp}")
+                    Log.d("AuthDebug", "Username entered: ${authViewModel.userName.isNotBlank()}")
+                    Log.d("AuthDebug", "Password length: ${authViewModel.passwordSignUp.length}")
                     Log.d("AuthDebug", "Email from previous screen: ${authViewModel.email}")
                     Log.d("AuthDebug", "Phone from previous screen: ${authViewModel.phoneNumber}")
 
                     // Check empty fields before calling Firebase
-                    if (authViewModel.userName.isBlank()) {
-                        Log.e("AuthDebug", "Username is EMPTY")
-                        Toast.makeText(context, "Enter username", Toast.LENGTH_SHORT).show()
+                    if (!authViewModel.userName.matches(Regex("^[a-z0-9_.]{3,20}$"))) {
+                        Log.e("AuthDebug", "Username is invalid")
+                        Toast.makeText(context, "Username must be 3-20 letters, numbers, _ or .", Toast.LENGTH_SHORT).show()
                         return@ButtonEx
                     }
 
@@ -205,13 +215,13 @@ fun UserNameAndPassScreen(
                         }
                     }
                 },
-                containerColor = Color(0xFF5865F2),
+                containerColor = MaterialTheme.colorScheme.primary,
                 textFontWeight = FontWeight.Medium
             )
 
 
 
-            Spacer(Modifier.Companion.height(32.dp))
+            Spacer(Modifier.Companion.height(24.dp))
 
         }
     }

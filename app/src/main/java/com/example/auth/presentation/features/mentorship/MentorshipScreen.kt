@@ -1,13 +1,14 @@
 package com.example.auth.presentation.features.mentorship
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
@@ -15,13 +16,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.auth.data.Mentor
+import com.example.auth.presentation.components.EngiFixBackground
 import com.example.auth.presentation.components.MentorCardEx
 import com.example.auth.presentation.components.MentorListShimmer
 import kotlinx.coroutines.delay
@@ -147,7 +147,7 @@ fun MentorshipScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = "Find Your Mentor",
+                            text = "Mentorship",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -155,7 +155,7 @@ fun MentorshipScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBackClick) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -176,16 +176,16 @@ fun MentorshipScreen(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.weight(1f).height(56.dp),
-                        placeholder = { Text("Search mentors...", color = Color(0xFF666666)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color(0xFF666666)) },
-                        shape = RoundedCornerShape(12.dp),
+                        placeholder = { Text("Search by skill, company, or mentor") },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                        shape = RoundedCornerShape(8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF6C5CE7),
-                            unfocusedBorderColor = Color(0xFF2C2C2E),
-                            focusedContainerColor = Color(0xFF2C2C2E),
-                            unfocusedContainerColor = Color(0xFF2C2C2E),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         singleLine = true
                     )
@@ -193,20 +193,16 @@ fun MentorshipScreen(
                         onClick = { /* Handle filter */ },
                         modifier = Modifier
                             .size(56.dp)
-                            .background(color = Color(0xFF2C2C2E), shape = RoundedCornerShape(12.dp))
+                            .background(color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                     ) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = Color.White)
+                        Icon(Icons.Default.FilterList, contentDescription = "Filter", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
         }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(paddingValues)
-        ) {
+        EngiFixBackground(modifier = Modifier.padding(paddingValues)) {
             if (isLoading) {
                 MentorListShimmer()
             } else {
@@ -225,13 +221,13 @@ fun MentorshipScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Top Mentors",
+                                text = "Available mentors",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Surface(
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(8.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer
                             ) {
                                 Text(
@@ -302,8 +298,8 @@ fun MentorshipScreen(
                             listState.animateScrollToItem(0)
                         }
                     },
-                    containerColor = Color(0xFF6C5CE7),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowUp,

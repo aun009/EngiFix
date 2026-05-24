@@ -38,13 +38,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dagger.hilt.android.EntryPointAccessors
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import com.example.auth.presentation.components.EngiFixBackground
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,10 +68,9 @@ fun ContestScreen(
     }
     val uiState by viewModel.uiState.collectAsState()
 
+    EngiFixBackground {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF1C1C1E))
+        modifier = Modifier.fillMaxSize()
     ) {
         // Top App Bar with back button and refresh
         TopAppBar(
@@ -80,7 +79,7 @@ fun ContestScreen(
                     "Contests",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    color = Color.White
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             navigationIcon = {
@@ -88,7 +87,7 @@ fun ContestScreen(
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             },
@@ -97,13 +96,13 @@ fun ContestScreen(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color(0xFF1C1C1E),
-                titleContentColor = Color.White
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onSurface
             )
         )
 
@@ -112,10 +111,10 @@ fun ContestScreen(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF1C1C1E)),
+                        .background(MaterialTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF6C5CE7))
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -159,16 +158,16 @@ fun ContestScreen(
                     NoContestsScreen()
                 } else {
                     println("📱 UI: Showing ${todayContests.size} today + ${tomorrowContests.size} tomorrow contests")
-                    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
-                        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1C1C1E))) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Column(modifier = Modifier.fillMaxSize()) {
                             TabRow(
                                 selectedTabIndex = selectedTabIndex,
-                                containerColor = Color(0xFF1C1C1E),
-                                contentColor = Color(0xFF6C5CE7),
+                                containerColor = MaterialTheme.colorScheme.background,
+                                contentColor = MaterialTheme.colorScheme.primary,
                                 indicator = { tabPositions ->
                                     TabRowDefaults.Indicator(
                                         modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                                        color = Color(0xFF6C5CE7)
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             ) {
@@ -178,7 +177,7 @@ fun ContestScreen(
                                     text = {
                                         Text(
                                             "Today (${todayContests.size})",
-                                            color = if (selectedTabIndex == 0) Color(0xFF6C5CE7) else Color(0xFF888888)
+                                            color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -188,7 +187,7 @@ fun ContestScreen(
                                     text = {
                                         Text(
                                             "Tomorrow (${tomorrowContests.size})",
-                                            color = if (selectedTabIndex == 1) Color(0xFF6C5CE7) else Color(0xFF888888)
+                                            color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -206,8 +205,8 @@ fun ContestScreen(
                                         DateSectionCard(
                                             title = if (selectedTabIndex == 0) "Today's Contests" else "Tomorrow's Contests",
                                             contestCount = activeContests.size,
-                                            sectionColor = if (selectedTabIndex == 0) Color(0xFF6C5CE7) else Color(0xFF4A5568),
-                                            iconColor = Color(0xFFFF6B9D),
+                                            sectionColor = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+                                            iconColor = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
                                             onContestClick = { uiModel ->
                                                 selectedContest = uiModel.raw
                                                 selectedPlatform = uiModel.platformName
@@ -223,7 +222,7 @@ fun ContestScreen(
                                         ) {
                                             Text(
                                                 "No contests scheduled.",
-                                                color = Color.Gray,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
                                         }
@@ -250,7 +249,7 @@ fun ContestScreen(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0xFF1C1C1E)),
+                        .background(MaterialTheme.colorScheme.background),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -259,23 +258,23 @@ fun ContestScreen(
                     ) {
                         Text(
                             "Something went wrong",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             msg,
-                            color = Color(0xFFAAAAAA),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         androidx.compose.material3.OutlinedButton(
                             onClick = { viewModel.fetchContests() },
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF6C5CE7)),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
                         ) {
-                            Text("Retry", color = Color(0xFF6C5CE7))
+                            Text("Retry", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -304,5 +303,6 @@ fun ContestScreen(
                 }
             }
         )
+    }
     }
 }

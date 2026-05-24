@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -76,7 +78,12 @@ private fun IntroScreen(onStart: () -> Unit, onBackClick: () -> Unit) {
                 .background(AccentGold.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center
         ) {
-            Text("🧮", fontSize = 48.sp)
+            Icon(
+                imageVector = Icons.Default.Calculate,
+                contentDescription = null,
+                tint = AccentGold,
+                modifier = Modifier.size(48.dp)
+            )
         }
         
         Spacer(Modifier.height(32.dp))
@@ -172,13 +179,19 @@ private fun PlayingScreen(
 
         // Combo
         if (state.combo > 1) {
-            Text(
-                text = "${state.combo}x Combo! 🔥",
-                color = AccentGold,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+            Row(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = AccentGold, modifier = Modifier.size(16.dp))
+                Text(
+                    text = "${state.combo}x Combo",
+                    color = AccentGold,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
         } else {
             Spacer(Modifier.height(20.dp))
         }

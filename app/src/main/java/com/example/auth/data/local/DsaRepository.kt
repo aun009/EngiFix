@@ -23,6 +23,8 @@ class DsaRepository @Inject constructor(
 
     fun getAllSheets(): Flow<List<ExploreSheetEntity>> = dao.getAllSheets()
 
+    fun getSheetsWithProgress(): Flow<List<SheetProgress>> = dao.getSheetsWithProgress()
+
     fun getSheetById(sheetId: String): Flow<ExploreSheetEntity?> = dao.getSheetById(sheetId)
 
     // ─── Questions ─────────────────────────────────────────────────────────────
