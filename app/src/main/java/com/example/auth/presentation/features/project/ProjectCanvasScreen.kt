@@ -40,6 +40,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,11 +52,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.auth.presentation.components.EngiFixBackground
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -90,16 +94,45 @@ import kotlin.math.sin
 @Composable
 fun ProjectCanvasScreen(onBackClick: () -> Unit) {
     var selectedTool by remember { mutableStateOf(CanvasTool.Select) }
-    var selectedColor by remember { mutableStateOf(Color(0xFF1D1D1F)) }
+    val defaultInk = MaterialTheme.colorScheme.onSurface
+    val paletteColors = remember(defaultInk) { canvasColors(defaultInk) }
+    var selectedColor by remember(defaultInk) { mutableStateOf(defaultInk) }
     var strokeWidth by remember { mutableFloatStateOf(5f) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var elements by remember { mutableStateOf<List<SketchElement>>(emptyList()) }
     var activePoints by remember { mutableStateOf<List<Offset>>(emptyList()) }
     var selectedElementId by remember { mutableStateOf<Long?>(null) }
+    var draggingElementId by remember { mutableStateOf<Long?>(null) }
     var nextElementId by remember { mutableLongStateOf(1L) }
     var pendingTextPoint by remember { mutableStateOf<Offset?>(null) }
     var textDraft by remember { mutableStateOf("") }
+    var selectionHintPending by remember { mutableStateOf(false) }
+    var selectionDebounceToken by remember { mutableLongStateOf(0L) }
+
+    val currentElements by rememberUpdatedState(elements)
+    val currentPan by rememberUpdatedState(pan)
+    val currentZoom by rememberUpdatedState(zoom)
+    val currentSelectedElementId by rememberUpdatedState(selectedElementId)
+
+    fun queueSelectToolAfterIdle() {
+        selectionHintPending = true
+        selectionDebounceToken++
+    }
+
+    fun resetSelectionDebounce() {
+        if (selectionHintPending) {
+            selectionHintPending = false
+            selectionDebounceToken++
+        }
+    }
+
+    LaunchedEffect(selectionDebounceToken, selectionHintPending) {
+        if (!selectionHintPending) return@LaunchedEffect
+        delay(SELECT_TOOL_DEBOUNCE_MS)
+        selectedTool = CanvasTool.Select
+        selectionHintPending = false
+    }
 
     fun addElement(tool: CanvasTool, points: List<Offset>, text: String = "") {
         val cleanPoints = points.sanitizeFor(tool)
@@ -116,7 +149,7 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
         )
         elements = elements + element
         selectedElementId = element.id
-        selectedTool = CanvasTool.Select
+        queueSelectToolAfterIdle()
     }
 
     Scaffold(
@@ -165,9 +198,11 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                 CanvasToolbar(
                     selectedTool = selectedTool,
                     selectedColor = selectedColor,
+                    paletteColors = paletteColors,
                     strokeWidth = strokeWidth,
                     onToolSelected = {
                         selectedTool = it
+                        selectionHintPending = false
                         if (it != CanvasTool.Select) selectedElementId = null
                     },
                     onColorSelected = { selectedColor = it },
@@ -179,32 +214,38 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                         .weight(1f)
                         .fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFCFBF8),
+                    color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Box(Modifier.fillMaxSize()) {
                         Canvas(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .pointerInput(selectedTool, zoom, pan, elements) {
+                                .pointerInput(selectedTool) {
                                     detectTapGestures { tap ->
-                                        val worldTap = tap.toWorld(pan, zoom)
+                                        resetSelectionDebounce()
+                                        val worldTap = tap.toWorld(currentPan, currentZoom)
                                         when (selectedTool) {
                                             CanvasTool.Text -> {
                                                 pendingTextPoint = worldTap
                                                 textDraft = ""
                                             }
-                                            CanvasTool.Select -> selectedElementId = elements.hitTest(worldTap, zoom)
+                                            CanvasTool.Select -> selectedElementId = currentElements.hitTest(worldTap, currentZoom)
                                             else -> Unit
                                         }
                                     }
                                 }
-                                .pointerInput(selectedTool, selectedColor, strokeWidth, zoom, pan, selectedElementId, elements) {
+                                .pointerInput(selectedTool) {
                                     detectDragGestures(
                                         onDragStart = { point ->
-                                            val worldPoint = point.toWorld(pan, zoom)
+                                            resetSelectionDebounce()
+                                            val worldPoint = point.toWorld(currentPan, currentZoom)
                                             when (selectedTool) {
-                                                CanvasTool.Select -> selectedElementId = elements.hitTest(worldPoint, zoom)
+                                                CanvasTool.Select -> {
+                                                    val hitId = currentElements.hitTest(worldPoint, currentZoom)
+                                                    selectedElementId = hitId
+                                                    draggingElementId = hitId
+                                                }
                                                 CanvasTool.Hand -> Unit
                                                 CanvasTool.Text -> Unit
                                                 else -> activePoints = listOf(worldPoint)
@@ -214,14 +255,17 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                                             change.consume()
                                             when (selectedTool) {
                                                 CanvasTool.Select -> {
-                                                    val id = selectedElementId ?: return@detectDragGestures
-                                                    val delta = dragAmount / zoom
-                                                    elements = elements.map { if (it.id == id) it.moveBy(delta) else it }
+                                                    val id = draggingElementId
+                                                        ?: currentSelectedElementId
+                                                        ?: return@detectDragGestures
+                                                    val delta = dragAmount / currentZoom
+                                                    selectedElementId = id
+                                                    elements = currentElements.map { if (it.id == id) it.moveBy(delta) else it }
                                                 }
-                                                CanvasTool.Hand -> pan += dragAmount
+                                                CanvasTool.Hand -> pan = currentPan + dragAmount
                                                 CanvasTool.Text -> Unit
                                                 else -> {
-                                                    val nextPoint = change.position.toWorld(pan, zoom)
+                                                    val nextPoint = change.position.toWorld(currentPan, currentZoom)
                                                     activePoints = if (selectedTool == CanvasTool.Pen) {
                                                         activePoints + nextPoint
                                                     } else {
@@ -235,8 +279,12 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                                                 addElement(selectedTool, activePoints)
                                             }
                                             activePoints = emptyList()
+                                            draggingElementId = null
                                         },
-                                        onDragCancel = { activePoints = emptyList() }
+                                        onDragCancel = {
+                                            activePoints = emptyList()
+                                            draggingElementId = null
+                                        }
                                     )
                                 }
                         ) {
@@ -245,7 +293,8 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                                     element = element,
                                     zoom = zoom,
                                     pan = pan,
-                                    selected = element.id == selectedElementId
+                                    selected = element.id == selectedElementId,
+                                    dragging = element.id == draggingElementId
                                 )
                             }
                             if (activePoints.size > 1) {
@@ -259,7 +308,8 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                                     ),
                                     zoom = zoom,
                                     pan = pan,
-                                    selected = false
+                                    selected = false,
+                                    dragging = false
                                 )
                             }
                         }
@@ -272,6 +322,14 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                                 .align(Alignment.BottomStart)
                                 .padding(10.dp)
                         )
+
+                        if (selectionHintPending) {
+                            SelectionDelayHint(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 10.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -311,6 +369,7 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
 private fun CanvasToolbar(
     selectedTool: CanvasTool,
     selectedColor: Color,
+    paletteColors: List<Color>,
     strokeWidth: Float,
     onToolSelected: (CanvasTool) -> Unit,
     onColorSelected: (Color) -> Unit,
@@ -341,7 +400,7 @@ private fun CanvasToolbar(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                CanvasPalette(selectedColor, onColorSelected)
+                CanvasPalette(selectedColor, paletteColors, onColorSelected)
                 Spacer(Modifier.weight(1f))
                 Text(
                     selectedTool.label,
@@ -388,10 +447,11 @@ private fun ToolButton(
 @Composable
 private fun CanvasPalette(
     selectedColor: Color,
+    colors: List<Color>,
     onColorSelected: (Color) -> Unit
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        canvasColors.forEach { color ->
+        colors.forEach { color ->
             Box(
                 modifier = Modifier
                     .size(24.dp)
@@ -435,11 +495,45 @@ private fun ZoomControls(
     }
 }
 
+@Composable
+private fun SelectionDelayHint(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(0.86f),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Text(
+                "Select tool will activate after a short pause",
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+    }
+}
+
 private fun DrawScope.drawSketchElement(
     element: SketchElement,
     zoom: Float,
     pan: Offset,
-    selected: Boolean
+    selected: Boolean,
+    dragging: Boolean
 ) {
     val screenPoints = element.points.map { it.toScreen(pan, zoom) }
     val scaledStroke = (element.strokeWidth * zoom).coerceAtLeast(1f)
@@ -476,12 +570,21 @@ private fun DrawScope.drawSketchElement(
 
     if (selected) {
         element.selectionBounds(zoom, pan)?.let { (topLeft, size) ->
+            if (dragging) {
+                drawRoundRect(
+                    color = Color(0x335E6AD2),
+                    topLeft = topLeft - Offset(3f, 3f),
+                    size = Size(size.width + 6f, size.height + 6f),
+                    cornerRadius = CornerRadius(10f, 10f),
+                    style = Stroke(width = 6f)
+                )
+            }
             drawRoundRect(
                 color = Color(0xFF5E6AD2),
-                topLeft = topLeft,
-                size = size,
+                topLeft = if (dragging) topLeft - Offset(2f, 2f) else topLeft,
+                size = if (dragging) Size(size.width + 4f, size.height + 4f) else size,
                 cornerRadius = CornerRadius(8f, 8f),
-                style = Stroke(width = 2f)
+                style = Stroke(width = if (dragging) 3f else 2f)
             )
         }
     }
@@ -605,9 +708,10 @@ private data class SketchElement(
 
 private const val MIN_ZOOM = 0.45f
 private const val MAX_ZOOM = 2.5f
+private const val SELECT_TOOL_DEBOUNCE_MS = 2400L
 
-private val canvasColors = listOf(
-    Color(0xFF1D1D1F),
+private fun canvasColors(defaultInk: Color) = listOf(
+    defaultInk,
     Color(0xFFC75F3A),
     Color(0xFF287C7A),
     Color(0xFF5E6AD2),

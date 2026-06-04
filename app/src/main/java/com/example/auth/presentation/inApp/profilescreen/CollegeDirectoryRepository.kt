@@ -1,13 +1,22 @@
 package com.example.auth.presentation.inApp.profilescreen
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+
+data class CollegeState(
+    val name: String,
+    val slug: String
+)
 
 data class CollegeSuggestion(
     val name: String,
@@ -19,78 +28,289 @@ data class CollegeSuggestion(
     val normalizedName: String = name.normalizedCollegeKey()
 }
 
+data class CollegeSearchResponse(
+    val colleges: List<CollegeSuggestion>,
+    val isFromCache: Boolean = false,
+    val warning: String? = null
+)
+
 class CollegeDirectoryRepository(
+    context: Context? = null,
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(25, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .callTimeout(18, TimeUnit.SECONDS)
         .build()
 ) {
-    suspend fun searchColleges(query: String, limit: Int = 8): Result<List<CollegeSuggestion>> =
+    private val prefs = context
+        ?.applicationContext
+        ?.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+
+    private val memorySearchCache = object : LinkedHashMap<String, List<CollegeSuggestion>>(
+        MAX_RECENT_SEARCHES,
+        0.75f,
+        true
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, List<CollegeSuggestion>>?
+        ): Boolean = size > MAX_RECENT_SEARCHES
+    }
+    private var memoryStates: List<CollegeState>? = null
+
+    suspend fun getStates(forceRefresh: Boolean = false): Result<List<CollegeState>> =
         withContext(Dispatchers.IO) {
+            if (!forceRefresh) {
+                memoryStates?.takeIf { it.isNotEmpty() }?.let { return@withContext Result.success(it) }
+                readCachedStates()?.takeIf { it.isNotEmpty() }?.let { cached ->
+                    memoryStates = cached
+                    return@withContext Result.success(cached)
+                }
+            }
+
             runCatching {
-                val cleanQuery = query.trim()
-                if (cleanQuery.length < 2) return@runCatching popularColleges.take(limit)
-
-                val localMatches = popularColleges.filter(cleanQuery, limit)
-
-                val encodedQuery = URLEncoder.encode(cleanQuery, "UTF-8")
                 val request = Request.Builder()
-                    .url("$BASE_URL/colleges?search=$encodedQuery&limit=$limit")
+                    .url("$BASE_URL/api/institutions/states")
                     .get()
                     .build()
 
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use localMatches
-                    val body = response.body?.string().orEmpty()
-                    val colleges = JSONObject(body).optJSONArray("colleges") ?: return@use localMatches
-                    val remoteMatches = buildList {
-                        for (index in 0 until colleges.length()) {
-                            val item = colleges.optJSONObject(index) ?: continue
-                            val name = item.optString("Name", item.optString("name")).trim()
-                            if (name.isBlank()) continue
-                            add(
-                                CollegeSuggestion(
-                                    name = name,
-                                    state = item.optString("State", item.optString("state")).trim(),
-                                    city = item.optString("City", item.optString("city")).trim(),
-                                    address = listOf(
-                                        item.optString("Address_line1", item.optString("addressLine1")).trim(),
-                                        item.optString("Address_line2", item.optString("addressLine2")).trim()
-                                    ).filter { it.isNotBlank() }.joinToString(" ")
-                                )
-                            )
-                        }
-                    }
+                val states = retryNetwork {
+                    parseStates(executeBody(request))
+                }.ifEmpty { fallbackStates }
 
-                    (remoteMatches + localMatches)
-                        .distinctBy { it.normalizedName }
-                        .take(limit)
-                        .ifEmpty { localMatches }
-                }
-            }.recover { popularColleges.filter(query, limit) }
+                memoryStates = states
+                cacheStates(states)
+                states
+            }.recover {
+                readCachedStates()?.takeIf { cached -> cached.isNotEmpty() } ?: fallbackStates
+            }
         }
 
-    private fun List<CollegeSuggestion>.filter(query: String, limit: Int): List<CollegeSuggestion> {
+    suspend fun searchColleges(
+        query: String,
+        state: String,
+        limit: Int = DEFAULT_LIMIT,
+        forceRefresh: Boolean = false
+    ): Result<CollegeSearchResponse> = withContext(Dispatchers.IO) {
+        val cleanQuery = query.sanitizedCollegeInput()
+        val cleanState = state.sanitizedCollegeInput()
+        val safeLimit = limit.coerceIn(1, DEFAULT_LIMIT)
+
+        if (cleanQuery.length < MIN_QUERY_LENGTH) {
+            return@withContext Result.success(
+                CollegeSearchResponse(
+                    colleges = emptyList(),
+                    warning = "Type at least 3 characters."
+                )
+            )
+        }
+
+        val localMatches = popularColleges.filter(cleanQuery, cleanState, safeLimit)
+        val cacheKey = searchCacheKey(cleanState, cleanQuery, safeLimit)
+
+        if (!forceRefresh) {
+            readCachedSearch(cacheKey)?.takeIf { it.isNotEmpty() }?.let { cached ->
+                return@withContext Result.success(
+                    CollegeSearchResponse(colleges = cached, isFromCache = true)
+                )
+            }
+        }
+
+        if (cleanState.isBlank()) {
+            return@withContext Result.success(
+                CollegeSearchResponse(
+                    colleges = localMatches,
+                    warning = "Select a state for complete API results."
+                )
+            )
+        }
+
+        runCatching {
+            val encodedState = URLEncoder.encode(cleanState, "UTF-8")
+            val encodedQuery = URLEncoder.encode(cleanQuery, "UTF-8")
+            val request = Request.Builder()
+                .url("$BASE_URL/api/institutions/search?state=$encodedState&q=$encodedQuery&page=1&limit=$safeLimit")
+                .get()
+                .build()
+
+            val remoteMatches = retryNetwork {
+                parseSearchResults(executeBody(request))
+            }
+
+            val colleges = (remoteMatches + localMatches)
+                .distinctBy { it.normalizedName }
+                .take(safeLimit)
+
+            val resolved = colleges.ifEmpty { localMatches }
+            cacheSearch(cacheKey, resolved)
+            CollegeSearchResponse(colleges = resolved)
+        }.recoverCatching { error ->
+            val cached = readCachedSearch(cacheKey)
+            when {
+                !cached.isNullOrEmpty() -> CollegeSearchResponse(
+                    colleges = cached,
+                    isFromCache = true,
+                    warning = "Network issue. Showing cached results."
+                )
+                localMatches.isNotEmpty() -> CollegeSearchResponse(
+                    colleges = localMatches,
+                    warning = "Network issue. Showing offline suggestions."
+                )
+                else -> throw IllegalStateException(error.message ?: "Could not load colleges.")
+            }
+        }
+    }
+
+    private fun executeBody(request: Request): String {
+        client.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw IllegalStateException("College API returned ${response.code}.")
+            }
+            if (body.isBlank()) {
+                throw IllegalStateException("College API returned an empty response.")
+            }
+            return body
+        }
+    }
+
+    private suspend fun <T> retryNetwork(block: () -> T): T {
+        var lastError: Throwable? = null
+        var waitMs = FIRST_RETRY_DELAY_MS
+
+        repeat(MAX_RETRIES) { attempt ->
+            try {
+                return block()
+            } catch (error: Throwable) {
+                lastError = error
+                if (attempt < MAX_RETRIES - 1) {
+                    delay(waitMs)
+                    waitMs *= 2
+                }
+            }
+        }
+
+        throw lastError ?: IllegalStateException("Network request failed.")
+    }
+
+    private fun readCachedSearch(key: String): List<CollegeSuggestion>? {
+        synchronized(memorySearchCache) {
+            memorySearchCache[key]?.let { return it }
+        }
+
+        val cached = prefs?.getString(key, null)
+            ?.let(::decodeSuggestions)
+            ?.takeIf { it.isNotEmpty() }
+            ?: return null
+
+        synchronized(memorySearchCache) {
+            memorySearchCache[key] = cached
+        }
+        return cached
+    }
+
+    private fun cacheSearch(key: String, colleges: List<CollegeSuggestion>) {
+        if (colleges.isEmpty()) return
+        synchronized(memorySearchCache) {
+            memorySearchCache[key] = colleges
+        }
+        prefs?.edit()?.putString(key, encodeSuggestions(colleges))?.apply()
+    }
+
+    private fun readCachedStates(): List<CollegeState>? =
+        prefs?.getString(STATES_CACHE_KEY, null)
+            ?.let(::decodeStates)
+            ?.takeIf { it.isNotEmpty() }
+
+    private fun cacheStates(states: List<CollegeState>) {
+        if (states.isEmpty()) return
+        prefs?.edit()?.putString(STATES_CACHE_KEY, encodeStates(states))?.apply()
+    }
+
+    private fun List<CollegeSuggestion>.filter(
+        query: String,
+        state: String,
+        limit: Int
+    ): List<CollegeSuggestion> {
         val normalized = query.normalizedCollegeKey()
         val compact = normalized.replace(" ", "")
-        return filter {
-            val name = it.name.normalizedCollegeKey()
-            val haystack = listOf(name, it.city.normalizedCollegeKey(), it.state.normalizedCollegeKey())
+        val normalizedState = state.normalizedCollegeKey()
+
+        return filter { college ->
+            val name = college.name.normalizedCollegeKey()
+            val collegeState = college.state.normalizedCollegeKey()
+            val haystack = listOf(name, college.city.normalizedCollegeKey(), collegeState)
                 .joinToString(" ")
             val acronym = name.split(" ")
                 .filterNot { word -> word in acronymStopWords }
                 .mapNotNull { word -> word.firstOrNull()?.toString() }
                 .joinToString("")
-            haystack.contains(normalized) ||
+            val matchesQuery = haystack.contains(normalized) ||
                     acronym.contains(compact) ||
                     compact.contains(acronym) ||
-                    normalized.split(" ").all { token -> token.length <= 1 || haystack.contains(token) }
+                    normalized.split(" ").all { token ->
+                        token.length <= 1 || haystack.contains(token)
+                    }
+            val matchesState = normalizedState.isBlank() || collegeState == normalizedState
+            matchesQuery && matchesState
         }.take(limit)
     }
 
     private companion object {
-        const val BASE_URL = "https://colleges-api.onrender.com"
+        const val BASE_URL = "https://indian-colleges-list.vercel.app"
+        const val CACHE_PREFS = "college_directory_cache"
+        const val STATES_CACHE_KEY = "states"
+        const val DEFAULT_LIMIT = 20
+        const val MIN_QUERY_LENGTH = 3
+        const val MAX_RETRIES = 3
+        const val MAX_RECENT_SEARCHES = 36
+        const val FIRST_RETRY_DELAY_MS = 250L
+
         val acronymStopWords = setOf("of", "and", "the", "for", "in")
+
+        val fallbackStates = listOf(
+            "Andaman and Nicobar Islands",
+            "Andhra Pradesh",
+            "Arunachal Pradesh",
+            "Assam",
+            "Bihar",
+            "Chandigarh",
+            "Chhattisgarh",
+            "Dadra and Nagar Haveli and Daman and Diu",
+            "Delhi",
+            "Goa",
+            "Gujarat",
+            "Haryana",
+            "Himachal Pradesh",
+            "Jammu and Kashmir",
+            "Jharkhand",
+            "Karnataka",
+            "Kerala",
+            "Ladakh",
+            "Lakshadweep",
+            "Madhya Pradesh",
+            "Maharashtra",
+            "Manipur",
+            "Meghalaya",
+            "Mizoram",
+            "Nagaland",
+            "Odisha",
+            "Puducherry",
+            "Punjab",
+            "Rajasthan",
+            "Sikkim",
+            "Tamil Nadu",
+            "Telangana",
+            "Tripura",
+            "Uttar Pradesh",
+            "Uttarakhand",
+            "West Bengal"
+        ).map { state ->
+            CollegeState(
+                name = state,
+                slug = state.normalizedCollegeKey().replace(" ", "-")
+            )
+        }
 
         val popularColleges = listOf(
             CollegeSuggestion("Indian Institute of Technology Bombay", "Maharashtra", "Mumbai", ""),
@@ -152,6 +372,172 @@ class CollegeDirectoryRepository(
         )
     }
 }
+
+private fun parseStates(body: String): List<CollegeState> {
+    val root = runCatching { JSONTokener(body).nextValue() }.getOrNull()
+    val states = when (root) {
+        is JSONObject -> root.firstArray("states", "data", "items", "results")
+        is JSONArray -> root
+        else -> null
+    } ?: return emptyList()
+
+    return buildList {
+        for (index in 0 until states.length()) {
+            when (val item = states.opt(index)) {
+                is JSONObject -> {
+                    val name = item.optFirstString("name", "state", "State")
+                    if (name.isNotBlank()) {
+                        add(
+                            CollegeState(
+                                name = name,
+                                slug = item.optFirstString("slug", "id").ifBlank {
+                                    name.normalizedCollegeKey().replace(" ", "-")
+                                }
+                            )
+                        )
+                    }
+                }
+                is String -> {
+                    val name = item.trim()
+                    if (name.isNotBlank()) {
+                        add(
+                            CollegeState(
+                                name = name,
+                                slug = name.normalizedCollegeKey().replace(" ", "-")
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }.distinctBy { it.name.normalizedCollegeKey() }
+        .sortedBy { it.name }
+}
+
+private fun parseSearchResults(body: String): List<CollegeSuggestion> {
+    val root = runCatching { JSONTokener(body).nextValue() }.getOrNull()
+    val institutions = when (root) {
+        is JSONObject -> root.firstArray("institutions", "results", "data", "items", "colleges")
+        is JSONArray -> root
+        else -> null
+    } ?: return emptyList()
+
+    return buildList {
+        for (index in 0 until institutions.length()) {
+            val item = institutions.optJSONObject(index) ?: continue
+            val name = item.optFirstString(
+                "name",
+                "Name",
+                "institutionName",
+                "institution_name",
+                "college",
+                "College Name"
+            )
+            if (name.isBlank()) continue
+
+            val state = item.optFirstString("state", "State", "stateName", "state_name")
+            val city = item.optFirstString("city", "City", "district", "District")
+            val address = listOf(
+                item.optFirstString("address", "Address"),
+                item.optFirstString("addressLine1", "Address_line1", "address_line1"),
+                item.optFirstString("addressLine2", "Address_line2", "address_line2")
+            ).filter { it.isNotBlank() }.joinToString(" ")
+
+            add(
+                CollegeSuggestion(
+                    name = name,
+                    state = state,
+                    city = city,
+                    address = address
+                )
+            )
+        }
+    }.distinctBy { it.normalizedName }
+}
+
+private fun JSONObject.firstArray(vararg keys: String): JSONArray? {
+    keys.forEach { key ->
+        optJSONArray(key)?.let { return it }
+    }
+    return null
+}
+
+private fun JSONObject.optFirstString(vararg keys: String): String {
+    keys.forEach { key ->
+        val value = optString(key).trim()
+        if (value.isNotBlank() && !value.equals("null", ignoreCase = true)) return value
+    }
+    return ""
+}
+
+private fun encodeSuggestions(colleges: List<CollegeSuggestion>): String =
+    JSONArray().apply {
+        colleges.forEach { college ->
+            put(
+                JSONObject()
+                    .put("name", college.name)
+                    .put("state", college.state)
+                    .put("city", college.city)
+                    .put("address", college.address)
+            )
+        }
+    }.toString()
+
+private fun decodeSuggestions(raw: String): List<CollegeSuggestion> =
+    runCatching {
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val name = item.optString("name").trim()
+                if (name.isBlank()) continue
+                add(
+                    CollegeSuggestion(
+                        name = name,
+                        state = item.optString("state").trim(),
+                        city = item.optString("city").trim(),
+                        address = item.optString("address").trim()
+                    )
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+
+private fun encodeStates(states: List<CollegeState>): String =
+    JSONArray().apply {
+        states.forEach { state ->
+            put(JSONObject().put("name", state.name).put("slug", state.slug))
+        }
+    }.toString()
+
+private fun decodeStates(raw: String): List<CollegeState> =
+    runCatching {
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val name = item.optString("name").trim()
+                if (name.isBlank()) continue
+                add(
+                    CollegeState(
+                        name = name,
+                        slug = item.optString("slug").ifBlank {
+                            name.normalizedCollegeKey().replace(" ", "-")
+                        }
+                    )
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+
+private fun searchCacheKey(state: String, query: String, limit: Int): String =
+    "search_${state.normalizedCollegeKey()}_${query.normalizedCollegeKey()}_$limit"
+
+fun String.sanitizedCollegeInput(): String =
+    replace(Regex("[^\\p{L}\\p{N}\\s.&'(),-]"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(120)
 
 fun String.normalizedCollegeKey(): String =
     trim()

@@ -22,17 +22,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -94,13 +95,16 @@ private val avatarGradient = Brush.linearGradient(
 fun ProfileScreen(
     navController: NavController? = null,
     viewModel: AuthViewModel = hiltViewModel(),
+    isDarkTheme: Boolean = false,
+    onThemeChange: (Boolean) -> Unit = {},
     onNavigateToLogin: () -> Unit = {}
 ) {
     val scope       = rememberCoroutineScope()
-    val scrollState = rememberScrollState()
     val context     = LocalContext.current
     val statsRepository = remember { CodingPlatformStatsRepository() }
-    val collegeRepository = remember { CollegeDirectoryRepository() }
+    val collegeRepository = remember(context) {
+        CollegeDirectoryRepository(context.applicationContext)
+    }
 
     // ── User state ────────────────────────────────────────────────────────────
     var userName    by remember { mutableStateOf("") }
@@ -525,176 +529,190 @@ fun ProfileScreen(
                 }
             }
 
-            else -> Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(bottom = 100.dp)
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 100.dp)
             ) {
                 // ── 1. Profile hero card ──────────────────────────────────────
-                ProfileHeroCard(
-                    displayName = displayName,
-                    userName    = userName,
-                    email       = email,
-                    headline    = headline,
-                    bio         = bio,
-                    photoUri    = photoUri,
-                    photoLocalUri = photoLocalUri,
-                    photoUrl    = photoUrl,
-                    dsaSolved   = dsaSolved,
-                    dsaTotal    = dsaTotal,
-                    platformCount = platforms.size,
-                    onPickPhoto  = { pickMedia.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )},
-                    onEditName   = { editingName = displayName; showNameEdit = true },
-                    onEditBio    = { editingBio = bio; showBioEdit = true },
-                    onOpenConnect = { navController?.navigate("connect") },
-                    onShareProfile = {
-                        shareProfile(
-                            context = context,
-                            displayName = displayName.ifBlank { userName },
-                            userName = userName,
-                            collegeName = collegeName,
-                            branch = branch,
-                            goalRole = goalRole,
-                            flexScore = flexScore,
-                            skills = skills
-                        )
-                    }
-                )
+                item {
+                    ProfileHeroCard(
+                        displayName = displayName,
+                        userName    = userName,
+                        email       = email,
+                        headline    = headline,
+                        bio         = bio,
+                        photoUri    = photoUri,
+                        photoLocalUri = photoLocalUri,
+                        photoUrl    = photoUrl,
+                        dsaSolved   = dsaSolved,
+                        dsaTotal    = dsaTotal,
+                        platformCount = platforms.size,
+                        onPickPhoto  = { pickMedia.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )},
+                        onEditName   = { editingName = displayName; showNameEdit = true },
+                        onEditBio    = { editingBio = bio; showBioEdit = true },
+                        onOpenConnect = { navController?.navigate("connect") },
+                        onShareProfile = {
+                            shareProfile(
+                                context = context,
+                                displayName = displayName.ifBlank { userName },
+                                userName = userName,
+                                collegeName = collegeName,
+                                branch = branch,
+                                goalRole = goalRole,
+                                flexScore = flexScore,
+                                skills = skills
+                            )
+                        }
+                    )
+                }
 
-                Spacer(Modifier.height(18.dp))
+                item { Spacer(Modifier.height(18.dp)) }
 
-                ProfileScoreSection(
-                    flexScore = flexScore,
-                    profileCompletion = profileCompletion,
-                    collegeRank = collegeRank,
-                    collegePeerCount = collegePeerCount,
-                    collegeName = collegeName
-                )
+                item {
+                    ProfileScoreSection(
+                        flexScore = flexScore,
+                        profileCompletion = profileCompletion,
+                        collegeRank = collegeRank,
+                        collegePeerCount = collegePeerCount,
+                        collegeName = collegeName
+                    )
+                }
 
-                Spacer(Modifier.height(14.dp))
+                item { Spacer(Modifier.height(14.dp)) }
 
-                AccountSettingsSection(
-                    username = userName,
-                    usernameUpdatedAt = usernameUpdatedAt,
-                    onEditPhoto = { pickMedia.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    ) },
-                    onEditName = { editingName = displayName; showNameEdit = true },
-                    onEditUsername = {
-                        editingUsername = userName
-                        usernameEditError = null
-                        showUsernameEdit = true
-                    },
-                    onEditBio = { editingBio = bio; showBioEdit = true },
-                    onLogout = { showLogout = true }
-                )
+                item {
+                    AccountSettingsSection(
+                        username = userName,
+                        usernameUpdatedAt = usernameUpdatedAt,
+                        isDarkTheme = isDarkTheme,
+                        onThemeChange = onThemeChange,
+                        onEditPhoto = { pickMedia.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        ) },
+                        onEditName = { editingName = displayName; showNameEdit = true },
+                        onEditUsername = {
+                            editingUsername = userName
+                            usernameEditError = null
+                            showUsernameEdit = true
+                        },
+                        onEditBio = { editingBio = bio; showBioEdit = true },
+                        onLogout = { showLogout = true }
+                    )
+                }
 
-                Spacer(Modifier.height(14.dp))
+                item { Spacer(Modifier.height(14.dp)) }
 
-                StudentIdentitySection(
-                    collegeName = collegeName,
-                    branch = branch,
-                    graduationYear = graduationYear,
-                    goalRole = goalRole,
-                    onEdit = {
-                        editingHeadline = headline
-                        editingCollege = collegeName
-                        editingCollegeKey = collegeKey
-                        editingCollegeCity = collegeCity
-                        editingCollegeState = collegeState
-                        editingBranch = branch
-                        editingGraduationYear = graduationYear
-                        editingGoalRole = goalRole
-                        showAcademicEdit = true
-                    }
-                )
+                item {
+                    StudentIdentitySection(
+                        collegeName = collegeName,
+                        branch = branch,
+                        graduationYear = graduationYear,
+                        goalRole = goalRole,
+                        onEdit = {
+                            editingHeadline = headline
+                            editingCollege = collegeName
+                            editingCollegeKey = collegeKey
+                            editingCollegeCity = collegeCity
+                            editingCollegeState = collegeState
+                            editingBranch = branch
+                            editingGraduationYear = graduationYear
+                            editingGoalRole = goalRole
+                            showAcademicEdit = true
+                        }
+                    )
+                }
 
-                Spacer(Modifier.height(14.dp))
+                item { Spacer(Modifier.height(14.dp)) }
 
-                SkillTagsSection(
-                    skills = skills,
-                    onEdit = {
-                        editingSkillsText = skills.joinToString(", ")
-                        showSkillsEdit = true
-                    }
-                )
+                item {
+                    SkillTagsSection(
+                        skills = skills,
+                        onEdit = {
+                            editingSkillsText = skills.joinToString(", ")
+                            showSkillsEdit = true
+                        }
+                    )
+                }
 
-                Spacer(Modifier.height(22.dp))
+                item { Spacer(Modifier.height(22.dp)) }
 
-                GithubProjectsSection(
-                    projects = projects,
-                    onAdd = {
-                        editingProjectId = null
-                        editingProjectTitle = ""
-                        editingProjectDescription = ""
-                        editingProjectRepoUrl = ""
-                        editingProjectLiveUrl = ""
-                        editingProjectTech = ""
-                        showProjectEdit = true
-                    },
-                    onEdit = { project ->
-                        editingProjectId = project.id
-                        editingProjectTitle = project.title
-                        editingProjectDescription = project.description
-                        editingProjectRepoUrl = project.repoUrl
-                        editingProjectLiveUrl = project.liveUrl
-                        editingProjectTech = project.tech.joinToString(", ")
-                        showProjectEdit = true
-                    },
-                    onRemove = { project -> removeProject(project.id) }
-                )
+                item {
+                    GithubProjectsSection(
+                        projects = projects,
+                        onAdd = {
+                            editingProjectId = null
+                            editingProjectTitle = ""
+                            editingProjectDescription = ""
+                            editingProjectRepoUrl = ""
+                            editingProjectLiveUrl = ""
+                            editingProjectTech = ""
+                            showProjectEdit = true
+                        },
+                        onEdit = { project ->
+                            editingProjectId = project.id
+                            editingProjectTitle = project.title
+                            editingProjectDescription = project.description
+                            editingProjectRepoUrl = project.repoUrl
+                            editingProjectLiveUrl = project.liveUrl
+                            editingProjectTech = project.tech.joinToString(", ")
+                            showProjectEdit = true
+                        },
+                        onRemove = { project -> removeProject(project.id) }
+                    )
+                }
 
-                Spacer(Modifier.height(22.dp))
+                item { Spacer(Modifier.height(22.dp)) }
 
                 // ── 2. Coding profiles ────────────────────────────────────────
-                CodingPlatformsSection(
-                    platforms       = platforms,
-                    statsRepository = statsRepository,
-                    onPlatformAdded = { pName, pUser ->
-                        scope.launch {
-                            if (platforms.any { it.name.equals(pName, ignoreCase = true) }) return@launch
-                            val np = CodingPlatform(pName, pUser, "N/A", "Loading...", Icons.Default.Star, null)
-                            platforms.add(np)
-                            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
-                            saveplatformsToFirestore(uid, platforms)
-                            try {
-                                val s = statsRepository.fetchStats(pName, pUser)
-                                val idx = platforms.indexOfFirst { it.name == pName && it.username == pUser }
-                                if (idx >= 0) {
-                                    platforms[idx] = platforms[idx].copy(stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl)
-                                    saveplatformsToFirestore(uid, platforms)
-                                }
-                            } catch (_: Exception) {}
-                        }
-                    },
-                    onPlatformRemoved = { plat ->
-                        scope.launch {
-                            platforms.remove(plat)
-                            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
-                            saveplatformsToFirestore(uid, platforms)
-                        }
-                    },
-                    onPlatformRefresh = { plat ->
-                        scope.launch {
-                            val idx = platforms.indexOfFirst { it.name == plat.name && it.username == plat.username }
-                            if (idx < 0) return@launch
-                            platforms[idx] = platforms[idx].copy(stats = "N/A", statsLabel = "Loading...")
-                            try {
-                                val s = statsRepository.fetchStats(plat.name, plat.username)
-                                platforms[idx] = platforms[idx].copy(stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl)
+                item {
+                    CodingPlatformsSection(
+                        platforms       = platforms,
+                        statsRepository = statsRepository,
+                        onPlatformAdded = { pName, pUser ->
+                            scope.launch {
+                                if (platforms.any { it.name.equals(pName, ignoreCase = true) }) return@launch
+                                val np = CodingPlatform(pName, pUser, "N/A", "Loading...", Icons.Default.Star, null)
+                                platforms.add(np)
                                 val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
                                 saveplatformsToFirestore(uid, platforms)
-                            } catch (_: Exception) {
-                                platforms[idx] = platforms[idx].copy(stats = "Error", statsLabel = "Failed to load")
+                                try {
+                                    val s = statsRepository.fetchStats(pName, pUser)
+                                    val idx = platforms.indexOfFirst { it.name == pName && it.username == pUser }
+                                    if (idx >= 0) {
+                                        platforms[idx] = platforms[idx].copy(stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl)
+                                        saveplatformsToFirestore(uid, platforms)
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                        },
+                        onPlatformRemoved = { plat ->
+                            scope.launch {
+                                platforms.remove(plat)
+                                val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+                                saveplatformsToFirestore(uid, platforms)
+                            }
+                        },
+                        onPlatformRefresh = { plat ->
+                            scope.launch {
+                                val idx = platforms.indexOfFirst { it.name == plat.name && it.username == plat.username }
+                                if (idx < 0) return@launch
+                                platforms[idx] = platforms[idx].copy(stats = "N/A", statsLabel = "Loading...")
+                                try {
+                                    val s = statsRepository.fetchStats(plat.name, plat.username)
+                                    platforms[idx] = platforms[idx].copy(stats = s.rating, statsLabel = s.statsLabel, profileImageUrl = s.profileImageUrl)
+                                    val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@launch
+                                    saveplatformsToFirestore(uid, platforms)
+                                } catch (_: Exception) {
+                                    platforms[idx] = platforms[idx].copy(stats = "Error", statsLabel = "Failed to load")
+                                }
                             }
                         }
-                    }
-                )
+                    )
+                }
 
-                Spacer(Modifier.height(16.dp))
+                item { Spacer(Modifier.height(16.dp)) }
             }
         }
     }
@@ -858,12 +876,15 @@ fun ProfileScreen(
                 )
                 CollegeAutocompleteField(
                     value = editingCollege,
+                    state = editingCollegeState,
                     repository = collegeRepository,
                     onValueChange = {
-                        editingCollege = it
+                        editingCollege = it.sanitizedCollegeInput()
                         editingCollegeKey = it.normalizedCollegeKey()
                         editingCollegeCity = ""
-                        editingCollegeState = ""
+                    },
+                    onStateChange = {
+                        editingCollegeState = it.sanitizedCollegeInput()
                     },
                     onCollegeSelected = { college ->
                         editingCollege = college.name
@@ -1198,29 +1219,136 @@ private fun ProfileEditBottomSheet(
 @Composable
 private fun CollegeAutocompleteField(
     value: String,
+    state: String,
     repository: CollegeDirectoryRepository,
     onValueChange: (String) -> Unit,
+    onStateChange: (String) -> Unit,
     onCollegeSelected: (CollegeSuggestion) -> Unit
 ) {
     var suggestions by remember { mutableStateOf<List<CollegeSuggestion>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
+    var searchWarning by remember { mutableStateOf<String?>(null) }
+    var retryNonce by remember { mutableIntStateOf(0) }
+    var states by remember { mutableStateOf<List<CollegeState>>(emptyList()) }
+    var statesLoading by remember { mutableStateOf(false) }
+    var statesError by remember { mutableStateOf<String?>(null) }
+    var statesRetryNonce by remember { mutableIntStateOf(0) }
+    var stateExpanded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(value) {
-        val query = value.trim()
-        if (query.length < 2) {
+    LaunchedEffect(statesRetryNonce) {
+        statesLoading = true
+        statesError = null
+        repository.getStates(forceRefresh = statesRetryNonce > 0)
+            .onSuccess { loaded ->
+                states = loaded
+                statesError = null
+            }
+            .onFailure { error ->
+                statesError = error.message ?: "Could not load states."
+            }
+        statesLoading = false
+    }
+
+    LaunchedEffect(value, state, retryNonce) {
+        val query = value.sanitizedCollegeInput()
+        if (query.length < 3) {
             suggestions = emptyList()
+            searchError = null
+            searchWarning = null
+            isSearching = false
             return@LaunchedEffect
         }
-        delay(320L)
+        delay(300L)
         isSearching = true
-        suggestions = repository.searchColleges(query).getOrDefault(emptyList())
+        searchError = null
+        repository.searchColleges(
+            query = query,
+            state = state,
+            limit = 20,
+            forceRefresh = retryNonce > 0
+        ).onSuccess { response ->
+            suggestions = response.colleges
+            searchWarning = response.warning ?: if (response.isFromCache) "Showing cached results." else null
+        }.onFailure { error ->
+            suggestions = emptyList()
+            searchWarning = null
+            searchError = error.message ?: "Could not load colleges."
+        }
         isSearching = false
     }
 
+    val visibleStates by remember(states, state) {
+        derivedStateOf {
+            val needle = state.normalizedCollegeKey()
+            val source = if (needle.isBlank()) {
+                states
+            } else {
+                states.filter { it.name.normalizedCollegeKey().contains(needle) }
+            }
+            source.take(8)
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box {
+            OutlinedTextField(
+                value = state,
+                onValueChange = { next ->
+                    onStateChange(next.sanitizedCollegeInput())
+                    stateExpanded = true
+                },
+                label = { Text("State") },
+                placeholder = { Text("Select state") },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                trailingIcon = {
+                    if (statesLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        IconButton(onClick = { stateExpanded = !stateExpanded }) {
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Show states")
+                        }
+                    }
+                },
+                supportingText = {
+                    val message = statesError ?: "State improves college matching."
+                    Text(message)
+                },
+                isError = statesError != null,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            DropdownMenu(
+                expanded = stateExpanded && (visibleStates.isNotEmpty() || statesError != null),
+                onDismissRequest = { stateExpanded = false }
+            ) {
+                visibleStates.forEach { collegeState ->
+                    DropdownMenuItem(
+                        text = { Text(collegeState.name) },
+                        onClick = {
+                            onStateChange(collegeState.name)
+                            stateExpanded = false
+                        }
+                    )
+                }
+                if (statesError != null) {
+                    DropdownMenuItem(
+                        text = { Text("Retry states") },
+                        onClick = {
+                            statesRetryNonce++
+                            stateExpanded = false
+                        },
+                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+                    )
+                }
+            }
+        }
+
         OutlinedTextField(
             value = value,
-            onValueChange = onValueChange,
+            onValueChange = { onValueChange(it.sanitizedCollegeInput()) },
             label = { Text("College") },
             placeholder = { Text("Start typing your college name") },
             singleLine = true,
@@ -1235,22 +1363,86 @@ private fun CollegeAutocompleteField(
             shape = RoundedCornerShape(8.dp)
         )
 
-        suggestions.take(5).forEach { college ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onCollegeSelected(college) },
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(college.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                    if (college.subtitle.isNotBlank()) {
-                        Text(college.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        when {
+            value.isNotBlank() && value.sanitizedCollegeInput().length < 3 -> {
+                Text(
+                    "Type at least 3 characters.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+            }
+            searchError != null -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.24f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            searchError.orEmpty(),
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontSize = 12.sp
+                        )
+                        TextButton(onClick = { retryNonce++ }) {
+                            Text("Retry")
+                        }
                     }
                 }
             }
+            searchWarning != null -> {
+                Text(
+                    searchWarning.orEmpty(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        if (suggestions.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 280.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(suggestions, key = { it.normalizedName }) { college ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onCollegeSelected(college) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(college.name, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            if (college.subtitle.isNotBlank()) {
+                                Text(college.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                            }
+                            if (college.address.isNotBlank()) {
+                                Text(
+                                    college.address,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (!isSearching && searchError == null && value.sanitizedCollegeInput().length >= 3) {
+            Text(
+                "No colleges found",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
         }
     }
 }
@@ -1285,7 +1477,13 @@ private fun ProfileHeroCard(
                 .fillMaxWidth()
                 .height(130.dp)
                 .background(
-                    Brush.linearGradient(listOf(Color(0xFFFFE0D0), Color(0xFFD7EFEC), Color(0xFFE3ECD9)))
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.tertiaryContainer,
+                            MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    )
                 )
         )
 
@@ -1590,6 +1788,8 @@ private fun ProfileScoreSection(
 private fun AccountSettingsSection(
     username: String,
     usernameUpdatedAt: Long,
+    isDarkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit,
     onEditPhoto: () -> Unit,
     onEditName: () -> Unit,
     onEditUsername: () -> Unit,
@@ -1606,6 +1806,13 @@ private fun AccountSettingsSection(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Settings", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+            SettingsToggleRow(
+                icon = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                title = "Dark theme",
+                subtitle = if (isDarkTheme) "Using dark colors" else "Using light colors",
+                checked = isDarkTheme,
+                onCheckedChange = onThemeChange
+            )
             SettingsActionRow(Icons.Default.CameraAlt, "Profile photo", "Crop and adjust", onEditPhoto)
             SettingsActionRow(Icons.Default.Person, "Display name", "Edit name", onEditName)
             SettingsActionRow(
@@ -1617,6 +1824,36 @@ private fun AccountSettingsSection(
             SettingsActionRow(Icons.Default.Edit, "Bio", "Edit about", onEditBio)
             SettingsActionRow(Icons.AutoMirrored.Filled.ExitToApp, "Logout", "Sign out", onLogout, danger = true)
         }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 8.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 1)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier.height(48.dp)
+        )
     }
 }
 
@@ -1868,7 +2105,7 @@ private fun GithubProjectsSection(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(6.dp))
                                     Text("Live")
                                 }

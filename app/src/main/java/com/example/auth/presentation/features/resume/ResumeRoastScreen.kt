@@ -207,61 +207,66 @@ fun ResumeRoastScreen(navController: NavController) {
                 )
             )
         },
-        bottomBar = {
-            ChatInputBar(
-                enabled = !isBusy,
-                input = input,
-                isBusy = isBusy,
-                onInputChange = { input = it },
-                onAttach = { filePickerLauncher.launch("application/pdf") },
-                onSend = { askAi(input) },
-                onFocusChange = { isChatInputFocused = it }
-            )
-        },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         EngiFixBackground(modifier = Modifier.padding(paddingValues)) {
-            Column(Modifier.fillMaxSize()) {
-                if (!collapseSetupPanel) {
-                    ResumeChatSetupPanel(
-                        hasResume = resumeText.isNotBlank(),
-                        selectedExperience = selectedExperience,
-                        targetRole = targetRole,
-                        experienceLevels = experienceLevels,
-                        isBusy = isBusy,
-                        onExperienceChange = { selectedExperience = it },
-                        onTargetRoleChange = { targetRole = it },
-                        onUploadClick = { filePickerLauncher.launch("application/pdf") }
-                    )
-                }
-
-                if (errorText != null && !collapseSetupPanel) {
-                    Text(
-                        text = errorText.orEmpty(),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
-                }
-
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(messages) { message ->
-                        ResumeMessageBubble(message)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+            ) {
+                Column(Modifier.weight(1f)) {
+                    if (!collapseSetupPanel) {
+                        ResumeChatSetupPanel(
+                            hasResume = resumeText.isNotBlank(),
+                            selectedExperience = selectedExperience,
+                            targetRole = targetRole,
+                            experienceLevels = experienceLevels,
+                            isBusy = isBusy,
+                            onExperienceChange = { selectedExperience = it },
+                            onTargetRoleChange = { targetRole = it },
+                            onUploadClick = { filePickerLauncher.launch("application/pdf") }
+                        )
                     }
-                    if (isBusy) {
-                        item {
-                            ResumeThinkingBubble()
+
+                    if (errorText != null && !collapseSetupPanel) {
+                        Text(
+                            text = errorText.orEmpty(),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(messages) { message ->
+                            ResumeMessageBubble(message)
+                        }
+                        if (isBusy) {
+                            item {
+                                ResumeThinkingBubble()
+                            }
                         }
                     }
                 }
+
+                ChatInputBar(
+                    enabled = !isBusy,
+                    input = input,
+                    isBusy = isBusy,
+                    onInputChange = { input = it },
+                    onAttach = { filePickerLauncher.launch("application/pdf") },
+                    onSend = { askAi(input) },
+                    onFocusChange = { isChatInputFocused = it }
+                )
             }
         }
     }
@@ -423,8 +428,6 @@ private fun ChatInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)

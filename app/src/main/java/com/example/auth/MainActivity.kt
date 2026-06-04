@@ -42,6 +42,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.auth.data.Mentor
+import com.example.auth.data.preferences.AppSettingsRepository
 import com.example.auth.presentation.authentication.AskFirstName
 import com.example.auth.presentation.authentication.AuthViewModel
 import com.example.auth.presentation.authentication.FirstScreen
@@ -65,6 +66,7 @@ import com.example.auth.presentation.animation.rememberMotionPolicy
 import com.example.auth.presentation.inApp.profilescreen.ConnectScreen
 import com.example.auth.ui.theme.AuthTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 // ─── Bottom nav tab definition ────────────────────────────────────────────────
 
@@ -105,7 +107,13 @@ class MainActivity : ComponentActivity() {
         startContestNotificationService()
 
         setContent {
-            AuthTheme {
+            val appSettingsRepository = remember {
+                AppSettingsRepository(applicationContext)
+            }
+            val isDarkTheme by appSettingsRepository.isDarkTheme.collectAsState(initial = false)
+            val settingsScope = rememberCoroutineScope()
+
+            AuthTheme(darkTheme = isDarkTheme) {
                 val navController = rememberNavController()
                 val authViewModel: AuthViewModel = viewModel()
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -180,6 +188,12 @@ class MainActivity : ComponentActivity() {
                                     ProfileScreen(
                                         navController = navController,
                                         viewModel = authViewModel,
+                                        isDarkTheme = isDarkTheme,
+                                        onThemeChange = { enabled ->
+                                            settingsScope.launch {
+                                                appSettingsRepository.setDarkTheme(enabled)
+                                            }
+                                        },
                                         onNavigateToLogin = {
                                             navController.navigate("first_screen") {
                                                 popUpTo(navController.graph.findStartDestination().id) {
