@@ -15,12 +15,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -236,14 +235,6 @@ fun TopAndMidHomeScreen(navController: NavHostController) {
                 ) { navController.navigate("ui") }
 
                 TipCardEx(
-                    title = "Mentorship",
-                    description = "Book focused guidance for interviews and projects",
-                    icon = Icons.Default.School,
-                    backgroundColor = MaterialTheme.colorScheme.surface,
-                    accentColor = Color(0xFFA7B894)
-                ) { navController.navigate("mentor") }
-
-                TipCardEx(
                     title = "Peer Network",
                     description = "Find students by college, branch, skills, and goals",
                     icon = Icons.Default.Groups,
@@ -252,12 +243,12 @@ fun TopAndMidHomeScreen(navController: NavHostController) {
                 ) { navController.navigate("connect") }
 
                 TipCardEx(
-                    title = "Canvas",
-                    description = "Sketch ideas, flows, and project diagrams on a canvas",
-                    icon = Icons.Default.AccountTree,
+                    title = "Alumni Referral Finder",
+                    description = "Find college alumni at target companies for referrals",
+                    icon = Icons.Default.Search,
                     backgroundColor = MaterialTheme.colorScheme.surface,
-                    accentColor = Color(0xFFFFC857)
-                ) { navController.navigate("project_canvas") }
+                    accentColor = Color(0xFFC75F3A)
+                ) { navController.navigate("alumni_referral") }
 
                 Spacer(Modifier.height(24.dp))
                 }

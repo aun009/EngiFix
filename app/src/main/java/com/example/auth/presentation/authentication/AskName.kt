@@ -98,7 +98,7 @@ fun AskFirstName(
                 singleLine = true,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
                     .padding(start = 8.dp, end = 8.dp)
             )
 

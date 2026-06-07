@@ -31,15 +31,15 @@ fun ButtonEx(
         interactionSource = interactionSource,
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .height(56.dp)
             .pressScale(interactionSource),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = containerColor)
     ) {
         Text(
             text = text,
             color = textColor,
-            fontSize = 16.sp,
+            fontSize = 18.sp,
             fontWeight = textFontWeight
         )
     }

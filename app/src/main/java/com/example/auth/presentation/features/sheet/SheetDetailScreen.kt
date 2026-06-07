@@ -65,7 +65,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,6 +92,7 @@ fun SheetDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     var query by remember(sheetId) { mutableStateOf("") }
     var selectedDifficulty by remember(sheetId) { mutableStateOf("All") }
     var hideSolved by remember(sheetId) { mutableStateOf(false) }
@@ -214,10 +217,15 @@ fun SheetDetailScreen(
                                     )
                                 }
 
-                                items(questions, key = { it.id }) { question ->
+                                items(
+                                    items = questions,
+                                    key = { it.id },
+                                    contentType = { "dsa_question" }
+                                ) { question ->
                                     DsaQuestionRow(
                                         question = question,
                                         onToggle = { isChecked ->
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                             viewModel.toggleCompletion(question.id, isChecked)
                                         },
                                         onOpen = {

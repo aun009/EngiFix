@@ -66,38 +66,64 @@ class ContestRepository @Inject constructor(private val api: ClistApi) {
         val today = calendar.time
         
         // Get tomorrow
-        calendar.add(Calendar.DAY_OF_YEAR, 1)
-        val tomorrow = calendar.time
+        val calTomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+        val tomorrow = calTomorrow.time
         
-        val todayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val todayStr = todayFormat.format(today)
-        val tomorrowStr = todayFormat.format(tomorrow)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayStr = dateFormat.format(today)
+        val tomorrowStr = dateFormat.format(tomorrow)
         
         return mapOf(
             "Codeforces" to listOf(
                 ContestItem(
                     id = 1,
-                    event = "Codeforces Round #123",
-                    start = "${todayStr}T10:00:00",
-                    end = "${todayStr}T12:00:00",
+                    event = "Codeforces Round #940 (Div. 2)",
+                    start = "${todayStr}T14:35:00", // 14:35 UTC = 8:05 PM IST
+                    end = "${todayStr}T16:35:00",   // 16:35 UTC = 10:05 PM IST
                     duration = "2 hours",
                     resource = "codeforces.com",
                     resource_id = 1,
                     host = "codeforces.com",
-                    href = "https://codeforces.com/contests/123"
+                    href = "https://codeforces.com/contests"
+                )
+            ),
+            "CodeChef" to listOf(
+                ContestItem(
+                    id = 2,
+                    event = "CodeChef Starters 130 (Div. 3)",
+                    start = "${todayStr}T12:30:00", // 12:30 UTC = 6:00 PM IST
+                    end = "${todayStr}T15:00:00",   // 15:00 UTC = 8:30 PM IST
+                    duration = "2 hours 30 minutes",
+                    resource = "codechef.com",
+                    resource_id = 2,
+                    host = "codechef.com",
+                    href = "https://www.codechef.com/contests"
                 )
             ),
             "LeetCode" to listOf(
                 ContestItem(
                     id = 3,
-                    event = "Weekly Contest 123",
-                    start = "${tomorrowStr}T10:00:00",
-                    end = "${tomorrowStr}T11:30:00",
+                    event = "Weekly Contest 395",
+                    start = "${tomorrowStr}T02:30:00", // 02:30 UTC = 8:00 AM IST
+                    end = "${tomorrowStr}T04:00:00",   // 04:00 UTC = 9:30 AM IST
                     duration = "1 hour 30 minutes",
                     resource = "leetcode.com",
                     resource_id = 102,
                     host = "leetcode.com",
-                    href = "https://leetcode.com/contest/weekly-contest-123"
+                    href = "https://leetcode.com/contest"
+                )
+            ),
+            "AtCoder" to listOf(
+                ContestItem(
+                    id = 4,
+                    event = "AtCoder Beginner Contest 350",
+                    start = "${tomorrowStr}T12:00:00", // 12:00 UTC = 5:30 PM IST
+                    end = "${tomorrowStr}T13:40:00",   // 13:40 UTC = 7:10 PM IST
+                    duration = "1 hour 40 minutes",
+                    resource = "atcoder.jp",
+                    resource_id = 3,
+                    host = "atcoder.jp",
+                    href = "https://atcoder.jp/contests"
                 )
             )
         )

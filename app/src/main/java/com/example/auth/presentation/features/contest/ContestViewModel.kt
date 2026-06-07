@@ -7,11 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 data class ContestUiModel(
     val raw: ContestItem,
@@ -19,8 +15,12 @@ data class ContestUiModel(
     val remainingTimeFormatted: String?,
     val formattedStartTime: String,
     val formattedEndTime: String,
+    val formattedStartDateTime: String,
+    val formattedEndDateTime: String,
     val formattedDuration: String,
-    val platformName: String
+    val platformName: String,
+    val startMillis: Long,
+    val endMillis: Long?
 )
 
 sealed class ContestUiState {
@@ -79,8 +79,8 @@ class ContestViewModel(
         val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
 
         for (contest in allContests) {
-            val startCal = parseContestDate(contest.start) ?: continue
-            val endCal = parseContestDate(contest.end)
+            val startCal = ContestDateTimeFormatter.parseToCalendar(contest.start) ?: continue
+            val endCal = ContestDateTimeFormatter.parseToCalendar(contest.end)
 
             val startYear = startCal.get(Calendar.YEAR)
             val startMonth = startCal.get(Calendar.MONTH)
@@ -126,19 +126,20 @@ class ContestViewModel(
                     raw = contest,
                     isCurrentlyRunning = isCurrentlyRunning,
                     remainingTimeFormatted = remainingTime,
-                    formattedStartTime = formatDateTime(startCal),
-                    formattedEndTime = if (endCal != null) formatDateTime(endCal) else contest.end,
-                    formattedDuration = contest.duration.replace(" hours", "h")
-                                                        .replace(" hour", "h")
-                                                        .replace(" minutes", "m")
-                                                        .replace(" minute", "m"),
+                    formattedStartTime = ContestDateTimeFormatter.formatCardTime(startCal),
+                    formattedEndTime = if (endCal != null) ContestDateTimeFormatter.formatCardTime(endCal) else "TBD",
+                    formattedStartDateTime = ContestDateTimeFormatter.formatDetailDateTime(startCal),
+                    formattedEndDateTime = if (endCal != null) ContestDateTimeFormatter.formatDetailDateTime(endCal) else "TBD",
+                    formattedDuration = ContestDateTimeFormatter.formatDuration(contest.duration),
                     platformName = when (contest.resource) {
                         "codeforces.com" -> "Codeforces"
                         "codechef.com" -> "CodeChef"
                         "atcoder.jp" -> "AtCoder"
                         "leetcode.com" -> "LeetCode"
                         else -> contest.resource
-                    }
+                    },
+                    startMillis = startCal.timeInMillis,
+                    endMillis = endCal?.timeInMillis
                 )
 
                 if (startsToday || isCurrentlyRunning) {
@@ -149,66 +150,9 @@ class ContestViewModel(
             }
         }
 
-        todayContests.sortBy { it.raw.start }
-        tomorrowContests.sortBy { it.raw.start }
+        todayContests.sortBy { it.startMillis }
+        tomorrowContests.sortBy { it.startMillis }
 
         return Pair(todayContests, tomorrowContests)
-    }
-
-    private fun parseContestDate(dateString: String): Calendar? {
-        try {
-            val timestamp = dateString.toLongOrNull()
-            if (timestamp != null) {
-                val date = if (timestamp > 1000000000000L) Date(timestamp) else Date(timestamp * 1000)
-                return Calendar.getInstance().apply { time = date }
-            }
-
-            val formats = listOf(
-                "dd.MM EEE HH:mm", "d.MM EEE HH:mm", "dd.M EEE HH:mm", "d.M EEE HH:mm",
-                "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss'Z'",
-                "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ssXXX"
-            )
-
-            var parsedDate: Date? = null
-            for (format in formats) {
-                try {
-                    val sdf = SimpleDateFormat(format, Locale.ENGLISH)
-                    if (format.contains("dd.MM") || format.contains("d.M")) {
-                        val parsed = sdf.parse(dateString)
-                        if (parsed != null) {
-                            val tempCal = Calendar.getInstance().apply { time = parsed }
-                            val now = Calendar.getInstance()
-                            val currentYear = now.get(Calendar.YEAR)
-                            val parsedMonth = tempCal.get(Calendar.MONTH)
-                            val year = if (parsedMonth < now.get(Calendar.MONTH)) currentYear + 1 else currentYear
-                            tempCal.set(Calendar.YEAR, year)
-                            parsedDate = tempCal.time
-                            break
-                        }
-                    } else {
-                        sdf.timeZone = TimeZone.getTimeZone("UTC")
-                        parsedDate = sdf.parse(dateString)
-                        if (parsedDate != null) break
-                    }
-                } catch (e: Exception) {}
-            }
-
-            if (parsedDate == null) return null
-
-            return Calendar.getInstance().apply { timeInMillis = parsedDate.time }
-        } catch (e: Exception) {
-            return null
-        }
-    }
-
-    private fun formatDateTime(cal: Calendar): String {
-        val dayOfWeek = when (cal.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY -> "Mon"; Calendar.TUESDAY -> "Tue"; Calendar.WEDNESDAY -> "Wed"
-            Calendar.THURSDAY -> "Thu"; Calendar.FRIDAY -> "Fri"; Calendar.SATURDAY -> "Sat"
-            Calendar.SUNDAY -> "Sun"; else -> ""
-        }
-        return String.format("%02d.%02d %s %02d:%02d",
-            cal.get(Calendar.DAY_OF_MONTH), cal.get(Calendar.MONTH) + 1, dayOfWeek,
-            cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
     }
 }

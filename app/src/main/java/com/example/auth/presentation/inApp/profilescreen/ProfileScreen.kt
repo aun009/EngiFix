@@ -27,10 +27,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -47,10 +50,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -101,6 +106,7 @@ fun ProfileScreen(
 ) {
     val scope       = rememberCoroutineScope()
     val context     = LocalContext.current
+    val haptics     = LocalHapticFeedback.current
     val statsRepository = remember { CodingPlatformStatsRepository() }
     val collegeRepository = remember(context) {
         CollegeDirectoryRepository(context.applicationContext)
@@ -108,7 +114,6 @@ fun ProfileScreen(
 
     // ── User state ────────────────────────────────────────────────────────────
     var userName    by remember { mutableStateOf("") }
-    var email       by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var bio         by remember { mutableStateOf("") }
     var photoUri    by remember { mutableStateOf<Uri?>(null) }   // local pick
@@ -196,8 +201,11 @@ fun ProfileScreen(
                 DsaDaoEntryPoint::class.java
             )
             val dao = hiltEntryPoint.dsaDao()
-            dsaSolved = dao.getTotalSolvedGlobal()
-            dsaTotal  = dao.getTotalQuestionsGlobal()
+            val stats = withContext(Dispatchers.IO) {
+                dao.getTotalSolvedGlobal() to dao.getTotalQuestionsGlobal()
+            }
+            dsaSolved = stats.first
+            dsaTotal  = stats.second
         } catch (_: Exception) {}
 
         // Firebase user data
@@ -215,7 +223,6 @@ fun ProfileScreen(
                 if (doc.exists()) {
                     userName    = doc.getString("userName")    ?: ""
                     usernameUpdatedAt = doc.getLong("usernameUpdatedAt") ?: 0L
-                    email       = doc.getString("email")       ?: ""
                     displayName = doc.getString("displayName") ?: ""
                     bio         = doc.getString("bio")         ?: ""
                     photoUrl    = doc.getString("photoUrl")    ?: ""
@@ -344,6 +351,7 @@ fun ProfileScreen(
                     FirebaseFirestore.getInstance().collection("users").document(uid)
                         .update("bio", newBio).await()
                 }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } catch (_: Exception) {}
         }
     }
@@ -357,6 +365,7 @@ fun ProfileScreen(
                     FirebaseFirestore.getInstance().collection("users").document(uid)
                         .update("displayName", newName).await()
                 }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } catch (_: Exception) {}
         }
     }
@@ -418,6 +427,7 @@ fun ProfileScreen(
                 usernameUpdatedAt = now
                 usernameEditError = null
                 showUsernameEdit = false
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 Toast.makeText(context, "Username updated", Toast.LENGTH_SHORT).show()
             } catch (error: Exception) {
                 usernameEditError = error.message ?: "Could not update username."
@@ -463,6 +473,7 @@ fun ProfileScreen(
                             )
                         ).await()
                 }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } catch (_: Exception) {}
         }
     }
@@ -476,6 +487,7 @@ fun ProfileScreen(
                     FirebaseFirestore.getInstance().collection("users").document(uid)
                         .update("skills", newSkills).await()
                 }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } catch (_: Exception) {}
         }
     }
@@ -494,6 +506,7 @@ fun ProfileScreen(
                     FirebaseFirestore.getInstance().collection("users").document(uid)
                         .update("projects", nextProjects.map { it.toFirestoreMap() }).await()
                 }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } catch (_: Exception) {}
         }
     }
@@ -508,6 +521,7 @@ fun ProfileScreen(
                     FirebaseFirestore.getInstance().collection("users").document(uid)
                         .update("projects", nextProjects.map { it.toFirestoreMap() }).await()
                 }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             } catch (_: Exception) {}
         }
     }
@@ -534,11 +548,10 @@ fun ProfileScreen(
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
                 // ── 1. Profile hero card ──────────────────────────────────────
-                item {
+                item(key = "profile_hero", contentType = "profile_hero") {
                     ProfileHeroCard(
                         displayName = displayName,
                         userName    = userName,
-                        email       = email,
                         headline    = headline,
                         bio         = bio,
                         photoUri    = photoUri,
@@ -552,6 +565,7 @@ fun ProfileScreen(
                         )},
                         onEditName   = { editingName = displayName; showNameEdit = true },
                         onEditBio    = { editingBio = bio; showBioEdit = true },
+                        onOpenSettings = { navController?.navigate("settings") },
                         onOpenConnect = { navController?.navigate("connect") },
                         onShareProfile = {
                             shareProfile(
@@ -568,9 +582,9 @@ fun ProfileScreen(
                     )
                 }
 
-                item { Spacer(Modifier.height(18.dp)) }
+                item(key = "spacer_after_hero", contentType = "spacer") { Spacer(Modifier.height(18.dp)) }
 
-                item {
+                item(key = "profile_score", contentType = "profile_score") {
                     ProfileScoreSection(
                         flexScore = flexScore,
                         profileCompletion = profileCompletion,
@@ -580,31 +594,9 @@ fun ProfileScreen(
                     )
                 }
 
-                item { Spacer(Modifier.height(14.dp)) }
+                item(key = "spacer_after_score", contentType = "spacer") { Spacer(Modifier.height(14.dp)) }
 
-                item {
-                    AccountSettingsSection(
-                        username = userName,
-                        usernameUpdatedAt = usernameUpdatedAt,
-                        isDarkTheme = isDarkTheme,
-                        onThemeChange = onThemeChange,
-                        onEditPhoto = { pickMedia.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        ) },
-                        onEditName = { editingName = displayName; showNameEdit = true },
-                        onEditUsername = {
-                            editingUsername = userName
-                            usernameEditError = null
-                            showUsernameEdit = true
-                        },
-                        onEditBio = { editingBio = bio; showBioEdit = true },
-                        onLogout = { showLogout = true }
-                    )
-                }
-
-                item { Spacer(Modifier.height(14.dp)) }
-
-                item {
+                item(key = "student_identity", contentType = "student_identity") {
                     StudentIdentitySection(
                         collegeName = collegeName,
                         branch = branch,
@@ -624,9 +616,9 @@ fun ProfileScreen(
                     )
                 }
 
-                item { Spacer(Modifier.height(14.dp)) }
+                item(key = "spacer_after_identity", contentType = "spacer") { Spacer(Modifier.height(14.dp)) }
 
-                item {
+                item(key = "skill_tags", contentType = "skill_tags") {
                     SkillTagsSection(
                         skills = skills,
                         onEdit = {
@@ -636,9 +628,9 @@ fun ProfileScreen(
                     )
                 }
 
-                item { Spacer(Modifier.height(22.dp)) }
+                item(key = "spacer_after_skills", contentType = "spacer") { Spacer(Modifier.height(22.dp)) }
 
-                item {
+                item(key = "github_projects", contentType = "github_projects") {
                     GithubProjectsSection(
                         projects = projects,
                         onAdd = {
@@ -663,10 +655,10 @@ fun ProfileScreen(
                     )
                 }
 
-                item { Spacer(Modifier.height(22.dp)) }
+                item(key = "spacer_after_projects", contentType = "spacer") { Spacer(Modifier.height(22.dp)) }
 
                 // ── 2. Coding profiles ────────────────────────────────────────
-                item {
+                item(key = "coding_platforms", contentType = "coding_platforms") {
                     CodingPlatformsSection(
                         platforms       = platforms,
                         statsRepository = statsRepository,
@@ -712,7 +704,7 @@ fun ProfileScreen(
                     )
                 }
 
-                item { Spacer(Modifier.height(16.dp)) }
+                item(key = "spacer_bottom", contentType = "spacer") { Spacer(Modifier.height(16.dp)) }
             }
         }
     }
@@ -744,68 +736,55 @@ fun ProfileScreen(
 
     // ── Name edit dialog ──────────────────────────────────────────────────────
     if (showNameEdit) {
-        AlertDialog(
-            onDismissRequest = { showNameEdit = false },
-            title = { Text("Edit Name", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = editingName,
-                    onValueChange = { editingName = it },
-                    label = { Text("Display Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { saveName(editingName.trim()); showNameEdit = false }) {
-                    Text("Save", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showNameEdit = false }) { Text("Cancel") }
-            },
-            shape = RoundedCornerShape(8.dp)
-        )
+        ProfileEditBottomSheet(
+            title = "Display name",
+            subtitle = "This is the name people see on your profile and peer cards.",
+            icon = Icons.Default.Person,
+            onDismiss = { showNameEdit = false },
+            onSave = {
+                saveName(editingName.trim())
+                showNameEdit = false
+            }
+        ) {
+            OutlinedTextField(
+                value = editingName,
+                onValueChange = { editingName = it.take(60) },
+                label = { Text("Display name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
     }
 
     if (showUsernameEdit) {
-        AlertDialog(
-            onDismissRequest = { showUsernameEdit = false },
-            title = { Text("Edit username", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = editingUsername,
-                        onValueChange = { value ->
-                            editingUsername = value
-                                .lowercase(Locale.ROOT)
-                                .filter { it.isLetterOrDigit() || it == '_' || it == '.' }
-                                .take(20)
-                            usernameEditError = null
-                        },
-                        label = { Text("Username") },
-                        prefix = { Text("@") },
-                        singleLine = true,
-                        isError = usernameEditError != null,
-                        supportingText = {
-                            Text(usernameEditError ?: "You can update username once every 7 days.")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { saveUsername(editingUsername) }) {
-                    Text("Save", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUsernameEdit = false }) { Text("Cancel") }
-            },
-            shape = RoundedCornerShape(8.dp)
-        )
+        ProfileEditBottomSheet(
+            title = "Username",
+            subtitle = "Keep it stable; you can update it once every 7 days.",
+            icon = Icons.Default.AlternateEmail,
+            onDismiss = { showUsernameEdit = false },
+            onSave = { saveUsername(editingUsername) }
+        ) {
+            OutlinedTextField(
+                value = editingUsername,
+                onValueChange = { value ->
+                    editingUsername = value
+                        .lowercase(Locale.ROOT)
+                        .filter { it.isLetterOrDigit() || it == '_' || it == '.' }
+                        .take(20)
+                    usernameEditError = null
+                },
+                label = { Text("Username") },
+                prefix = { Text("@") },
+                singleLine = true,
+                isError = usernameEditError != null,
+                supportingText = {
+                    Text(usernameEditError ?: "Use letters, numbers, underscores or dots.")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
     }
 
     if (showPhotoAdjuster && pendingPhotoUri != null) {
@@ -1074,6 +1053,386 @@ fun ProfileScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
+    navController: NavController,
+    isDarkTheme: Boolean,
+    onThemeChange: (Boolean) -> Unit,
+    onNavigateToLogin: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+
+    var userName by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
+    var photoUrl by remember { mutableStateOf("") }
+    var photoLocalUri by remember { mutableStateOf("") }
+    var pendingPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var showPhotoAdjuster by remember { mutableStateOf(false) }
+    var isPhotoSaving by remember { mutableStateOf(false) }
+    var usernameUpdatedAt by remember { mutableLongStateOf(0L) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    var showNameEdit by remember { mutableStateOf(false) }
+    var editingName by remember { mutableStateOf("") }
+    var showBioEdit by remember { mutableStateOf(false) }
+    var editingBio by remember { mutableStateOf("") }
+    var showUsernameEdit by remember { mutableStateOf(false) }
+    var editingUsername by remember { mutableStateOf("") }
+    var usernameEditError by remember { mutableStateOf<String?>(null) }
+    var showLogout by remember { mutableStateOf(false) }
+
+    val pickMedia = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        pendingPhotoUri = uri
+        showPhotoAdjuster = true
+    }
+
+    LaunchedEffect(Unit) {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            isLoading = false
+            return@LaunchedEffect
+        }
+        photoLocalUri = loadLocalProfilePhoto(context, currentUser.uid)
+        try {
+            val doc = withContext(Dispatchers.IO) {
+                FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(currentUser.uid)
+                    .get()
+                    .await()
+            }
+            userName = doc.getString("userName").orEmpty()
+            displayName = doc.getString("displayName").orEmpty()
+            bio = doc.getString("bio").orEmpty()
+            photoUrl = doc.getString("photoUrl").orEmpty()
+            usernameUpdatedAt = doc.getLong("usernameUpdatedAt") ?: 0L
+        } catch (_: Exception) {
+        } finally {
+            isLoading = false
+        }
+    }
+
+    fun saveName(newName: String) {
+        displayName = newName
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    FirebaseFirestore.getInstance().collection("users").document(uid)
+                        .update("displayName", newName).await()
+                }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun saveBio(newBio: String) {
+        bio = newBio
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    FirebaseFirestore.getInstance().collection("users").document(uid)
+                        .update("bio", newBio).await()
+                }
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun saveUsername(newUsername: String) {
+        val cleanUsername = newUsername.trim().lowercase(Locale.ROOT)
+        val normalizedUsername = cleanUsername.normalizedUsernameKey()
+        if (!cleanUsername.isValidUsername()) {
+            usernameEditError = "Use 3-20 letters, numbers, underscores or dots."
+            return
+        }
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        scope.launch {
+            try {
+                val now = System.currentTimeMillis()
+                withContext(Dispatchers.IO) {
+                    val db = FirebaseFirestore.getInstance()
+                    val userRef = db.collection("users").document(uid)
+                    val usernameRef = db.collection("usernames").document(normalizedUsername)
+
+                    db.runTransaction { transaction ->
+                        val userSnapshot = transaction.get(userRef)
+                        val storedUsername = userSnapshot.getString("userName").orEmpty()
+                        val storedNormalized = userSnapshot.getString("userNameNormalized")
+                            ?: storedUsername.normalizedUsernameKey()
+                        val lastUpdated = userSnapshot.getLong("usernameUpdatedAt") ?: 0L
+                        val changed = storedNormalized != normalizedUsername
+
+                        if (changed && lastUpdated > 0L && now - lastUpdated < USERNAME_UPDATE_INTERVAL_MS) {
+                            throw IllegalStateException(usernameCooldownMessage(lastUpdated, now))
+                        }
+
+                        val ownerSnapshot = transaction.get(usernameRef)
+                        val ownerUid = ownerSnapshot.getString("uid")
+                        if (ownerSnapshot.exists() && ownerUid != uid) {
+                            throw IllegalStateException("Username already taken.")
+                        }
+
+                        if (storedNormalized.isNotBlank() && storedNormalized != normalizedUsername) {
+                            transaction.delete(db.collection("usernames").document(storedNormalized))
+                        }
+
+                        transaction.set(
+                            usernameRef,
+                            mapOf("uid" to uid, "userName" to cleanUsername, "updatedAt" to now)
+                        )
+                        transaction.update(
+                            userRef,
+                            mapOf(
+                                "userName" to cleanUsername,
+                                "userNameNormalized" to normalizedUsername,
+                                "usernameUpdatedAt" to now
+                            )
+                        )
+                    }.await()
+                }
+                userName = cleanUsername
+                usernameUpdatedAt = now
+                usernameEditError = null
+                showUsernameEdit = false
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                Toast.makeText(context, "Username updated", Toast.LENGTH_SHORT).show()
+            } catch (error: Exception) {
+                usernameEditError = error.message ?: "Could not update username."
+            }
+        }
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                )
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    item {
+                        AccountSettingsSection(
+                            username = userName,
+                            usernameUpdatedAt = usernameUpdatedAt,
+                            isDarkTheme = isDarkTheme,
+                            onThemeChange = onThemeChange,
+                            onEditPhoto = {
+                                pickMedia.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            onEditName = {
+                                editingName = displayName
+                                showNameEdit = true
+                            },
+                            onEditUsername = {
+                                editingUsername = userName
+                                usernameEditError = null
+                                showUsernameEdit = true
+                            },
+                            onEditBio = {
+                                editingBio = bio
+                                showBioEdit = true
+                            },
+                            onLogout = { showLogout = true }
+                        )
+                    }
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Text(
+                                "Profile content stays on your profile. App controls, account edits, and sign out live here.",
+                                modifier = Modifier.padding(14.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showNameEdit) {
+        ProfileEditBottomSheet(
+            title = "Display name",
+            subtitle = "This is the name people see on your profile and peer cards.",
+            icon = Icons.Default.Person,
+            onDismiss = { showNameEdit = false },
+            onSave = {
+                saveName(editingName.trim())
+                showNameEdit = false
+            }
+        ) {
+            OutlinedTextField(
+                value = editingName,
+                onValueChange = { editingName = it.take(60) },
+                label = { Text("Display name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
+    }
+
+    if (showBioEdit) {
+        ProfileEditBottomSheet(
+            title = "Edit bio",
+            subtitle = "Make it short, specific, and useful for people who want to connect.",
+            icon = Icons.Default.Edit,
+            onDismiss = { showBioEdit = false },
+            onSave = {
+                saveBio(editingBio.trim())
+                showBioEdit = false
+            }
+        ) {
+            OutlinedTextField(
+                value = editingBio,
+                onValueChange = { if (it.length <= 220) editingBio = it },
+                placeholder = { Text("Example: Android developer exploring Firebase, DSA and open-source projects.") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp),
+                maxLines = 6,
+                shape = RoundedCornerShape(8.dp),
+                supportingText = {
+                    Text("${editingBio.length}/220", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                }
+            )
+        }
+    }
+
+    if (showUsernameEdit) {
+        ProfileEditBottomSheet(
+            title = "Username",
+            subtitle = "Keep it stable; you can update it once every 7 days.",
+            icon = Icons.Default.AlternateEmail,
+            onDismiss = { showUsernameEdit = false },
+            onSave = { saveUsername(editingUsername) }
+        ) {
+            OutlinedTextField(
+                value = editingUsername,
+                onValueChange = { value ->
+                    editingUsername = value
+                        .lowercase(Locale.ROOT)
+                        .filter { it.isLetterOrDigit() || it == '_' || it == '.' }
+                        .take(20)
+                    usernameEditError = null
+                },
+                label = { Text("Username") },
+                prefix = { Text("@") },
+                singleLine = true,
+                isError = usernameEditError != null,
+                supportingText = {
+                    Text(usernameEditError ?: "Use letters, numbers, underscores or dots.")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
+    }
+
+    if (showPhotoAdjuster && pendingPhotoUri != null) {
+        ProfilePhotoAdjustDialog(
+            sourceUri = pendingPhotoUri!!,
+            isSaving = isPhotoSaving,
+            onDismiss = {
+                if (!isPhotoSaving) {
+                    showPhotoAdjuster = false
+                    pendingPhotoUri = null
+                }
+            },
+            onSave = { zoom, offsetX, offsetY ->
+                val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@ProfilePhotoAdjustDialog
+                scope.launch {
+                    isPhotoSaving = true
+                    val savedUri = prepareAdjustedProfilePhoto(
+                        context = context,
+                        uid = uid,
+                        sourceUri = pendingPhotoUri!!,
+                        zoom = zoom,
+                        offsetX = offsetX,
+                        offsetY = offsetY
+                    )
+                    if (savedUri != null) {
+                        photoLocalUri = savedUri
+                        val backendUrl = uploadProfilePhotoToBackend(uid, Uri.parse(savedUri))
+                        if (backendUrl.isNotBlank()) photoUrl = backendUrl
+                    }
+                    isPhotoSaving = false
+                    showPhotoAdjuster = false
+                    pendingPhotoUri = null
+                }
+            }
+        )
+    }
+
+    if (showLogout) {
+        AlertDialog(
+            onDismissRequest = { showLogout = false },
+            title = { Text("Logout?", fontWeight = FontWeight.Bold) },
+            text = { Text("You will be signed out of your account.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogout = false
+                    scope.launch {
+                        FirebaseAuth.getInstance().signOut()
+                        onNavigateToLogin()
+                    }
+                }) {
+                    Text("Logout", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogout = false }) { Text("Cancel") }
+            },
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+}
+
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 private suspend fun saveplatformsToFirestore(uid: String, platforms: List<CodingPlatform>) {
@@ -1177,11 +1536,13 @@ private fun ProfileEditBottomSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
+        val scrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .imePadding()
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp)
         ) {
@@ -1234,7 +1595,7 @@ private fun CollegeAutocompleteField(
     var statesLoading by remember { mutableStateOf(false) }
     var statesError by remember { mutableStateOf<String?>(null) }
     var statesRetryNonce by remember { mutableIntStateOf(0) }
-    var stateExpanded by remember { mutableStateOf(false) }
+    var stateSuggestionsVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(statesRetryNonce) {
         statesLoading = true
@@ -1286,62 +1647,97 @@ private fun CollegeAutocompleteField(
             } else {
                 states.filter { it.name.normalizedCollegeKey().contains(needle) }
             }
-            source.take(8)
+            source.take(6)
         }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box {
-            OutlinedTextField(
-                value = state,
-                onValueChange = { next ->
-                    onStateChange(next.sanitizedCollegeInput())
-                    stateExpanded = true
-                },
-                label = { Text("State") },
-                placeholder = { Text("Select state") },
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                trailingIcon = {
-                    if (statesLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        IconButton(onClick = { stateExpanded = !stateExpanded }) {
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Show states")
-                        }
+        OutlinedTextField(
+            value = state,
+            onValueChange = { next ->
+                onStateChange(next.sanitizedCollegeInput())
+                stateSuggestionsVisible = true
+            },
+            label = { Text("State") },
+            placeholder = { Text("Select state") },
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+            trailingIcon = {
+                if (statesLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    IconButton(onClick = { stateSuggestionsVisible = !stateSuggestionsVisible }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Show states")
                     }
-                },
-                supportingText = {
-                    val message = statesError ?: "State improves college matching."
-                    Text(message)
-                },
-                isError = statesError != null,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
-            )
+                }
+            },
+            supportingText = {
+                val message = statesError ?: "State improves college matching."
+                Text(message)
+            },
+            isError = statesError != null,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        )
 
-            DropdownMenu(
-                expanded = stateExpanded && (visibleStates.isNotEmpty() || statesError != null),
-                onDismissRequest = { stateExpanded = false }
+        if (stateSuggestionsVisible && visibleStates.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 visibleStates.forEach { collegeState ->
-                    DropdownMenuItem(
-                        text = { Text(collegeState.name) },
-                        onClick = {
-                            onStateChange(collegeState.name)
-                            stateExpanded = false
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onStateChange(collegeState.name)
+                                stateSuggestionsVisible = false
+                            },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                collegeState.name,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
-                    )
+                    }
                 }
-                if (statesError != null) {
-                    DropdownMenuItem(
-                        text = { Text("Retry states") },
-                        onClick = {
-                            statesRetryNonce++
-                            stateExpanded = false
-                        },
-                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
+            }
+        } else if (stateSuggestionsVisible && statesError != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.24f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        statesError.orEmpty(),
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 12.sp
                     )
+                    TextButton(onClick = { statesRetryNonce++ }) {
+                        Text("Retry")
+                    }
                 }
             }
         }
@@ -1405,13 +1801,13 @@ private fun CollegeAutocompleteField(
         }
 
         if (suggestions.isNotEmpty()) {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 280.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(suggestions, key = { it.normalizedName }) { college ->
+                suggestions.take(6).forEach { college ->
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1436,6 +1832,13 @@ private fun CollegeAutocompleteField(
                         }
                     }
                 }
+                if (suggestions.size > 6) {
+                    Text(
+                        "${suggestions.size - 6} more matches. Keep typing to narrow it down.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
+                    )
+                }
             }
         } else if (!isSearching && searchError == null && value.sanitizedCollegeInput().length >= 3) {
             Text(
@@ -1455,7 +1858,6 @@ private fun CollegeAutocompleteField(
 private fun ProfileHeroCard(
     displayName: String,
     userName: String,
-    email: String,
     headline: String,
     bio: String,
     photoUri: Uri?,
@@ -1467,6 +1869,7 @@ private fun ProfileHeroCard(
     onPickPhoto: () -> Unit,
     onEditName: () -> Unit,
     onEditBio: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenConnect: () -> Unit,
     onShareProfile: () -> Unit
 ) {
@@ -1542,13 +1945,17 @@ private fun ProfileHeroCard(
                 Spacer(Modifier.height(10.dp))
 
                 // Name row + edit
-                Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
                         text = displayName.ifEmpty { userName.ifEmpty { "User" } },
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f)
                     )
                     IconButton(
                         onClick = onEditName,
@@ -1558,11 +1965,20 @@ private fun ProfileHeroCard(
                             modifier = Modifier.size(15.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Settings,
+                            "Settings",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                val showUsername = userName.isNotBlank() && !userName.equals(email, ignoreCase = true)
-                val showEmail = email.isNotBlank() && !email.equals(userName, ignoreCase = true)
-                if (showUsername) {
+                if (userName.isNotBlank()) {
                     Text("@$userName", fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -1571,11 +1987,6 @@ private fun ProfileHeroCard(
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(top = 3.dp))
                 }
-                if (showEmail) {
-                    Text(email, fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

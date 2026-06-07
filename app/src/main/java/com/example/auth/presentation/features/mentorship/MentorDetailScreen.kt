@@ -29,6 +29,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.auth.BuildConfig
 import com.example.auth.data.Mentor
 import com.example.auth.presentation.features.payment.PaymentManager
 import com.google.firebase.auth.FirebaseAuth
@@ -43,7 +44,7 @@ fun MentorDetailScreen(
     mentor: Mentor,
     onBackClick: () -> Unit = {},
     onGetAccessClick: () -> Unit = {},
-    razorpayKeyId: String = "YOUR_RAZORPAY_KEY_ID" // Pass your Razorpay key from MainActivity
+    razorpayKeyId: String = BuildConfig.RAZORPAY_KEY_ID
 ) {
     val scrollState = rememberScrollState()
     val context = LocalContext.current

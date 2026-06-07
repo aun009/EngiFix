@@ -2,6 +2,7 @@ package com.example.auth.presentation.features.payment
 
 import android.app.Activity
 import android.util.Log
+import com.example.auth.BuildConfig
 import com.razorpay.Checkout
 import com.razorpay.PaymentData
 import com.razorpay.PaymentResultWithDataListener
@@ -10,12 +11,11 @@ import org.json.JSONObject
 /**
  * PaymentManager handles Razorpay payment integration
  * 
- * IMPORTANT: Replace "YOUR_RAZORPAY_KEY_ID" with your actual Razorpay Key ID
- * You can get this from: https://dashboard.razorpay.com/app/keys
+ * Provide RAZORPAY_KEY_ID through local.properties or the build environment.
  */
 class PaymentManager(
     private val activity: Activity,
-    private val razorpayKeyId: String = "Ra0lrZSfzfYokS" // Replace with your actual key
+    private val razorpayKeyId: String = BuildConfig.RAZORPAY_KEY_ID
 ) : PaymentResultWithDataListener {
 
     companion object {
@@ -40,6 +40,15 @@ class PaymentManager(
         userContact: String = "+919999999999"
     ) {
         try {
+            if (razorpayKeyId.isBlank()) {
+                onPaymentError(
+                    PaymentError.INVALID_OPTIONS.code,
+                    "Payment is not configured yet.",
+                    null
+                )
+                return
+            }
+
             val checkout = Checkout()
             checkout.setKeyID(razorpayKeyId)
 
@@ -150,4 +159,3 @@ class PaymentManager(
         UNKNOWN_ERROR(-1)
     }
 }
-

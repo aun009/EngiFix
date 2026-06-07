@@ -19,6 +19,8 @@ class AuthViewModel @Inject constructor() : ViewModel() {
 
     var loginSuccess by mutableStateOf(false)
 
+    val currentUser get() = auth.currentUser
+
 
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 

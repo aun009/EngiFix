@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,20 +36,21 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedIconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -337,10 +339,20 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
     }
 
     pendingTextPoint?.let { point ->
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { pendingTextPoint = null },
-            title = { Text("Add text", fontWeight = FontWeight.Bold) },
-            text = {
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Add text", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 OutlinedTextField(
                     value = textDraft,
                     onValueChange = { if (it.length <= 80) textDraft = it },
@@ -350,18 +362,27 @@ fun ProjectCanvasScreen(onBackClick: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(8.dp)
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    addElement(CanvasTool.Text, listOf(point), textDraft)
-                    pendingTextPoint = null
-                }) { Text("Add", fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingTextPoint = null }) { Text("Cancel") }
-            },
-            shape = RoundedCornerShape(8.dp)
-        )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { pendingTextPoint = null },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            addElement(CanvasTool.Text, listOf(point), textDraft)
+                            pendingTextPoint = null
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Add", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -1,307 +1,164 @@
 package com.example.auth.presentation.authentication
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.RocketLaunch
-import androidx.compose.material.icons.filled.ViewInAr
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.auth.presentation.animation.rememberMotionPolicy
-import com.example.auth.presentation.components.EngiFixBackground
-import com.example.auth.presentation.components.Eyebrow
+import com.example.auth.presentation.animation.AnimatedStarsBackground
+import com.example.auth.presentation.components.ButtonEx
 
 @Composable
 fun FirstScreen(navController: NavController) {
-    val motion = rememberMotionPolicy()
-    var contentVisible by remember { mutableStateOf(false) }
-    var pointerX by remember { mutableFloatStateOf(0.5f) }
-    var pointerY by remember { mutableFloatStateOf(0.5f) }
-
-    LaunchedEffect(Unit) {
-        contentVisible = true
-    }
-
-    EngiFixBackground {
-        AnimatedVisibility(
-            visible = contentVisible,
-            enter = fadeIn(tween(motion.duration(620))) +
-                    slideInVertically(
-                        animationSpec = tween(motion.duration(620), easing = FastOutSlowInEasing),
-                        initialOffsetY = { it / 6 }
-                    ),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val position = event.changes.firstOrNull()?.position ?: continue
-                                pointerX = (position.x / size.width).coerceIn(0f, 1f)
-                                pointerY = (position.y / size.height).coerceIn(0f, 1f)
-                            }
-                        }
-                    }
-            ) {
-                val iconShiftX = ((pointerX - 0.5f) * 18f).dp
-                val iconShiftY = ((pointerY - 0.5f) * 18f).dp
-
-                FloatingHeroIcon(
-                    icon = Icons.Default.AutoAwesome,
-                    tint = Color(0xFF7B61FF),
-                    baseX = 22.dp,
-                    baseY = 94.dp,
-                    shiftX = iconShiftX,
-                    shiftY = iconShiftY
-                )
-                FloatingHeroIcon(
-                    icon = Icons.Default.BarChart,
-                    tint = Color(0xFF5E6AD2),
-                    baseX = maxWidth - 66.dp,
-                    baseY = 58.dp,
-                    shiftX = iconShiftX,
-                    shiftY = iconShiftY
-                )
-                FloatingHeroIcon(
-                    icon = Icons.Default.ViewInAr,
-                    tint = Color(0xFF1D7CF2),
-                    baseX = 26.dp,
-                    baseY = maxHeight * 0.51f,
-                    shiftX = iconShiftX,
-                    shiftY = iconShiftY
-                )
-                FloatingHeroIcon(
-                    icon = Icons.Default.RocketLaunch,
-                    tint = Color(0xFFA765F4),
-                    baseX = maxWidth - 66.dp,
-                    baseY = maxHeight * 0.46f,
-                    shiftX = iconShiftX,
-                    shiftY = iconShiftY
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 28.dp, vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(Modifier.height(44.dp))
-                    Eyebrow(text = "SMARTER TOOLS • BIGGER IMPACT", icon = Icons.Default.AutoAwesome)
-                    Spacer(Modifier.height(18.dp))
-
-                    Text(
-                        text = buildAnnotatedString {
-                            append("Everything You\nNeed to ")
-                            withStyle(SpanStyle(color = Color(0xFF246BFD))) {
-                                append("Create,\nGrow & Scale")
-                            }
-                        },
-                        style = MaterialTheme.typography.displayMedium.copy(
-                            fontSize = 40.sp,
-                            lineHeight = 45.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    Text(
-                        text = "Practice, opportunities, contests, and progress in one calm workspace built for engineering students.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 23.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp)
-                    )
-
-                    Spacer(Modifier.height(32.dp))
-
-                    Column(
-                        modifier = Modifier.fillMaxWidth(0.84f),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
-                            onClick = { navController.navigate("register_screen") },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "Register",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Button(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
-                            onClick = { navController.navigate("login_screen") },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "Log In",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        OutlinedButton(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp),
-                            onClick = {
-                                navController.navigate("home") {
-                                    popUpTo("first_screen") { inclusive = true }
-                                }
-                            },
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.onBackground
-                            ),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                brush = Brush.horizontalGradient(
-                                    listOf(
-                                        MaterialTheme.colorScheme.primary,
-                                        MaterialTheme.colorScheme.tertiary
-                                    )
-                                )
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "Continue as Guest",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FloatingHeroIcon(
-    icon: ImageVector,
-    tint: Color,
-    baseX: Dp,
-    baseY: Dp,
-    shiftX: Dp,
-    shiftY: Dp
-) {
-    val animatedX by animateDpAsState(
-        targetValue = baseX + shiftX,
-        animationSpec = tween(360, easing = FastOutSlowInEasing),
-        label = "hero_icon_x"
-    )
-    val animatedY by animateDpAsState(
-        targetValue = baseY + shiftY,
-        animationSpec = tween(360, easing = FastOutSlowInEasing),
-        label = "hero_icon_y"
-    )
-
-    Surface(
+    val isDark = isSystemInDarkTheme()
+    
+    Box(
         modifier = Modifier
-            .offset(x = animatedX, y = animatedY)
-            .size(52.dp)
-            .graphicsLayer {
-                shadowElevation = 12f
-                shape = RoundedCornerShape(16.dp)
-                clip = false
-            },
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.72f))
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        Box(
+        // Show animated stars background only in dark theme for a premium night look
+        if (isDark) {
+            AnimatedStarsBackground()
+        }
+
+        // Foreground UI
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        listOf(tint.copy(alpha = 0.16f), Color.Transparent)
-                    )
-                ),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(24.dp)
-            )
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Branding Section
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Typographic Logo Box
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(20.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "EF",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = MaterialTheme.typography.displayMedium.fontFamily
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // App Title
+                Text(
+                    text = "EngiFix",
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Subtitle
+                Text(
+                    text = "The Career OS for Engineering Students",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Slogan / Tagline
+                Text(
+                    text = "Build a flex-worthy profile, practice DSA, track contests, and connect with mentors.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    lineHeight = 20.sp
+                )
+            }
+
+            // Buttons / Auth Actions Section
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Register Button
+                ButtonEx(
+                    text = "Create Account",
+                    onClick = { navController.navigate("register_screen") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    textColor = MaterialTheme.colorScheme.onPrimary,
+                    textFontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Log In Button
+                ButtonEx(
+                    text = "Log In",
+                    onClick = { navController.navigate("login_screen") },
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textFontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Divider and Guest Action
+                Text(
+                    text = "or test the app as a guest user",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                OutlinedButton(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    onClick = { navController.navigate("home") },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Continue as Guest",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
+            }
         }
     }
 }

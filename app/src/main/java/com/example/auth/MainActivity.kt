@@ -10,8 +10,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -20,10 +26,8 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -41,7 +45,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.auth.data.Mentor
 import com.example.auth.data.preferences.AppSettingsRepository
 import com.example.auth.presentation.authentication.AskFirstName
 import com.example.auth.presentation.authentication.AuthViewModel
@@ -53,17 +56,15 @@ import com.example.auth.presentation.features.contest.ContestNotificationService
 import com.example.auth.presentation.features.contest.ContestScreen
 import com.example.auth.presentation.features.aptitude.AptitudeGameScreen
 import com.example.auth.presentation.features.jobs.JobsScreen
-import com.example.auth.presentation.features.mentorship.MentorDetailScreen
-import com.example.auth.presentation.features.mentorship.MentorshipScreen
-import com.example.auth.presentation.features.project.ProjectCanvasScreen
 import com.example.auth.presentation.features.sheet.ExploreSheetScreen
 import com.example.auth.presentation.features.sheet.SheetDetailScreen
 import com.example.auth.presentation.inApp.homescreen.HomeScreen
 import com.example.auth.presentation.inApp.profilescreen.ProfileScreen
-import com.example.auth.presentation.features.resume.ResumeRoastScreen
+import com.example.auth.presentation.inApp.profilescreen.SettingsScreen
 import com.example.auth.presentation.animation.EngiFixIntroOverlay
 import com.example.auth.presentation.animation.rememberMotionPolicy
 import com.example.auth.presentation.inApp.profilescreen.ConnectScreen
+import com.example.auth.presentation.features.referral.AlumniReferralScreen
 import com.example.auth.ui.theme.AuthTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -80,7 +81,6 @@ private data class BottomTab(
 private val bottomTabs = listOf(
     BottomTab("home",         "Home",    Icons.Filled.Home,                    Icons.Outlined.Home),
     BottomTab("sheets",       "Sheets",  Icons.AutoMirrored.Filled.MenuBook,   Icons.AutoMirrored.Outlined.MenuBook),
-    BottomTab("resume_roast", "Insights", Icons.Filled.Description,             Icons.Outlined.Description),
     BottomTab("profile",      "Profile", Icons.Filled.Person,                  Icons.Outlined.Person),
 )
 
@@ -88,8 +88,10 @@ private val bottomTabs = listOf(
 private val routesWithoutBottomBar = setOf(
     "first_screen", "register_screen", "login_screen",
     "ask_name_screen", "username_pass_screen",
-    "mentor_detail", "sheet_detail/{sheetId}",
-    "mentor", "ui"          // these are full-screen from home cards, keep bar for now
+    "sheet_detail/{sheetId}",
+    "settings",
+    "ui",          // full-screen from home cards, keep bar hidden for now
+    "alumni_referral"
 )
 
 @AndroidEntryPoint
@@ -149,9 +151,24 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .padding(paddingValues)
                         ) {
+                            val startDest = remember {
+                                if (authViewModel.currentUser != null) "home" else "first_screen"
+                            }
                             NavHost(
                                 navController = navController,
-                                startDestination = "first_screen"
+                                startDestination = startDest,
+                                enterTransition = {
+                                    slideInHorizontally(initialOffsetX = { it }) + fadeIn(animationSpec = tween(300))
+                                },
+                                exitTransition = {
+                                    slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(animationSpec = tween(300))
+                                },
+                                popEnterTransition = {
+                                    slideInHorizontally(initialOffsetX = { -it }) + fadeIn(animationSpec = tween(300))
+                                },
+                                popExitTransition = {
+                                    slideOutHorizontally(targetOffsetX = { it }) + fadeOut(animationSpec = tween(300))
+                                }
                             ) {
                                 // ── Auth flow ──────────────────────────────
                                 composable("first_screen") {
@@ -171,23 +188,60 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 // ── Main tabs (bottom bar visible) ─────────
-                                composable("home") {
+                                composable(
+                                    route = "home",
+                                    enterTransition = { EnterTransition.None },
+                                    exitTransition = { ExitTransition.None },
+                                    popEnterTransition = { EnterTransition.None },
+                                    popExitTransition = { ExitTransition.None }
+                                ) {
                                     HomeScreen(navController)
                                 }
-                                composable("sheets") {
+                                composable(
+                                    route = "sheets",
+                                    enterTransition = { EnterTransition.None },
+                                    exitTransition = { ExitTransition.None },
+                                    popEnterTransition = { EnterTransition.None },
+                                    popExitTransition = { ExitTransition.None }
+                                ) {
                                     ExploreSheetScreen(
                                         onSheetClick = { sheetId ->
                                             navController.navigate("sheet_detail/$sheetId")
                                         }
                                     )
                                 }
-                                composable("resume_roast") {
-                                    ResumeRoastScreen(navController)
-                                }
-                                composable("profile") {
+                                composable(
+                                    route = "profile",
+                                    enterTransition = { EnterTransition.None },
+                                    exitTransition = { ExitTransition.None },
+                                    popEnterTransition = { EnterTransition.None },
+                                    popExitTransition = { ExitTransition.None }
+                                ) {
                                     ProfileScreen(
                                         navController = navController,
                                         viewModel = authViewModel,
+                                        isDarkTheme = isDarkTheme,
+                                        onThemeChange = { enabled ->
+                                            settingsScope.launch {
+                                                 appSettingsRepository.setDarkTheme(enabled)
+                                            }
+                                        },
+                                        onNavigateToLogin = {
+                                            navController.navigate("first_screen") {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    inclusive = true
+                                                }
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    )
+                                }
+                                composable("connect") {
+                                    ConnectScreen(onBackClick = { navController.navigateUp() })
+                                }
+                                composable("settings") {
+                                    SettingsScreen(
+                                        navController = navController,
                                         isDarkTheme = isDarkTheme,
                                         onThemeChange = { enabled ->
                                             settingsScope.launch {
@@ -204,9 +258,6 @@ class MainActivity : ComponentActivity() {
                                         }
                                     )
                                 }
-                                composable("connect") {
-                                    ConnectScreen(onBackClick = { navController.navigateUp() })
-                                }
 
                                 // ── Detail screens (bottom bar hidden) ─────
                                 composable("sheet_detail/{sheetId}") { backStackEntry ->
@@ -217,19 +268,6 @@ class MainActivity : ComponentActivity() {
                                         onBackClick = { navController.navigateUp() }
                                     )
                                 }
-                                composable("mentor_detail") {
-                                    val mentor = navController.previousBackStackEntry
-                                        ?.savedStateHandle?.get<Mentor>("selected_mentor")
-                                    mentor?.let {
-                                        MentorDetailScreen(
-                                            mentor = it,
-                                            onBackClick = { navController.navigateUp() },
-                                            onGetAccessClick = { navController.navigateUp() },
-                                            razorpayKeyId = "YOUR_RAZORPAY_KEY_ID"
-                                        )
-                                    }
-                                }
-
                                 // ── Feature screens (navigated from home cards, bottom bar hidden) ──
                                 composable("internships") {
                                     JobsScreen(onBackClick = { navController.navigateUp() })
@@ -237,21 +275,13 @@ class MainActivity : ComponentActivity() {
                                 composable("ui") {
                                     ContestScreen(onBackClick = { navController.navigateUp() })
                                 }
-                                composable("mentor") {
-                                    MentorshipScreen(
-                                        onBackClick = { navController.navigateUp() },
-                                        onMentorClick = { mentor ->
-                                            navController.currentBackStackEntry
-                                                ?.savedStateHandle?.set("selected_mentor", mentor)
-                                            navController.navigate("mentor_detail")
-                                        }
-                                    )
-                                }
-                                composable("project_canvas") {
-                                    ProjectCanvasScreen(onBackClick = { navController.navigateUp() })
-                                }
                                 composable("game") {
                                     AptitudeGameScreen(
+                                        onBackClick = { navController.navigateUp() }
+                                    )
+                                }
+                                composable("alumni_referral") {
+                                    AlumniReferralScreen(
                                         onBackClick = { navController.navigateUp() }
                                     )
                                 }

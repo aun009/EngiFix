@@ -20,6 +20,7 @@ foundation = "1.9.0"
 volley = "1.2.1"
 visionInternalVkp = "18.2.3"
 coreI18n = "1.0.0"
+navigation = "2.7.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -47,6 +48,7 @@ androidx-compose-foundation = { group = "androidx.compose.foundation", name = "f
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
 vision-internal-vkp = { group = "com.google.mlkit", name = "vision-internal-vkp", version.ref = "visionInternalVkp" }
 androidx-core-i18n = { group = "androidx.core", name = "core-i18n", version.ref = "coreI18n" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

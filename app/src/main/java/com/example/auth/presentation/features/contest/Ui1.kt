@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -36,11 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dagger.hilt.android.EntryPointAccessors
 import androidx.compose.ui.text.font.FontWeight
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -53,8 +52,7 @@ fun ContestScreen(
     onBackClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    var selectedContest by remember { mutableStateOf<ContestItem?>(null) }
-    var selectedPlatform by remember { mutableStateOf<String>("") }
+    var selectedContest by remember { mutableStateOf<ContestUiModel?>(null) }
     var selectedTabIndex by remember { mutableStateOf(0) }
     
     val viewModel = remember {
@@ -78,7 +76,7 @@ fun ContestScreen(
                 Text(
                     "Contests",
                     style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             },
@@ -208,8 +206,7 @@ fun ContestScreen(
                                             sectionColor = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
                                             iconColor = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
                                             onContestClick = { uiModel ->
-                                                selectedContest = uiModel.raw
-                                                selectedPlatform = uiModel.platformName
+                                                selectedContest = uiModel
                                             },
                                             contests = activeContests
                                         )
@@ -260,7 +257,7 @@ fun ContestScreen(
                             "Something went wrong",
                             color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                            fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
@@ -283,19 +280,21 @@ fun ContestScreen(
     }
     
     // Show contest detail screen when a contest is selected
-    selectedContest?.let { contest ->
+    selectedContest?.let { uiModel ->
+        BackHandler {
+            selectedContest = null
+        }
+
         ContestDetailScreen(
-            contest = contest,
-            platformColor = PlatformColors.getColorForPlatform(selectedPlatform),
-            platformName = selectedPlatform,
+            contest = uiModel,
+            platformColor = PlatformColors.getColorForPlatform(uiModel.platformName),
             onBackClick = {
                 selectedContest = null
-                selectedPlatform = ""
             },
             onOpenContest = {
                 // Open the contest URL in browser
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(contest.href))
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uiModel.raw.href))
                     context.startActivity(intent)
                 } catch (e: Exception) {
                     // Handle error if browser can't be opened

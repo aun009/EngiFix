@@ -1,29 +1,30 @@
 package com.example.auth.presentation.features.contest
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.concurrent.TimeUnit
+import androidx.core.content.ContextCompat
 
 class NotificationHelper(private val context: Context) {
-    
+
     companion object {
         const val CHANNEL_ID = "contest_notifications"
-        const val CHANNEL_NAME = "Contest Reminders"
-        const val CHANNEL_DESCRIPTION = "Notifications for upcoming coding contests"
+        const val CHANNEL_NAME = "Contest reminders"
+        const val CHANNEL_DESCRIPTION = "Alerts 25 minutes before coding contests"
     }
-    
+
     init {
         createNotificationChannel()
     }
-    
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -33,108 +34,105 @@ class NotificationHelper(private val context: Context) {
             ).apply {
                 description = CHANNEL_DESCRIPTION
                 enableVibration(true)
-                enableLights(true)
+                enableLights(false)
             }
-            
+
             val notificationManager = context.getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(channel)
         }
     }
-    
-    fun showContestReminder(contest: ContestItem, platformName: String) {
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(contest.href))
-        val pendingIntent = PendingIntent.getActivity(
+
+    fun showContestReminder(
+        contest: ContestItem,
+        platformName: String,
+        contestStartMillis: Long? = ContestReminderPolicy.parseStartMillis(contest.start)
+    ): Boolean {
+        val prefs = context.getSharedPreferences("contest_notifications", Context.MODE_PRIVATE)
+        val notificationKey = ContestReminderPolicy.notifiedKey(contest, contestStartMillis)
+
+        if (prefs.getBoolean(notificationKey, false)) {
+            android.util.Log.d("NotificationHelper", "Reminder already sent for: ${contest.event}")
+            return false
+        }
+
+        if (!canPostNotifications()) {
+            android.util.Log.w("NotificationHelper", "Notifications are disabled or not permitted")
+            return false
+        }
+
+        val eventName = ContestReminderPolicy.cleanContestName(contest.event)
+        val startLabel = ContestReminderPolicy.formatStartTime(contestStartMillis)
+        val contentIntent = buildContentPendingIntent(contest)
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(ContestReminderPolicy.notificationTitle(contestStartMillis))
+            .setContentText("$eventName • $platformName")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("$eventName\n$platformName • $startLabel")
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setColor(0xFF5865F2.toInt())
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent)
+            .build()
+
+        return try {
+            NotificationManagerCompat.from(context).notify(notificationId(contest, contestStartMillis), notification)
+            prefs.edit().putBoolean(notificationKey, true).apply()
+            android.util.Log.d("NotificationHelper", "Contest reminder sent for: ${contest.event}")
+            true
+        } catch (securityException: SecurityException) {
+            android.util.Log.w("NotificationHelper", "Missing notification permission", securityException)
+            false
+        }
+    }
+
+    fun checkAndNotifyUpcomingContests(contests: List<ContestItem>, platformName: String) {
+        contests.forEach { contest ->
+            val startMillis = ContestReminderPolicy.parseStartMillis(contest.start)
+            if (startMillis == null) {
+                android.util.Log.w("NotificationHelper", "Could not parse contest start: ${contest.start}")
+                return@forEach
+            }
+
+            if (ContestReminderPolicy.shouldNotifyNow(startMillis)) {
+                showContestReminder(contest, platformName, startMillis)
+            }
+        }
+    }
+
+    private fun buildContentPendingIntent(contest: ContestItem): PendingIntent {
+        val intent = if (contest.href.isNotBlank()) {
+            Intent(Intent.ACTION_VIEW, Uri.parse(contest.href))
+        } else {
+            context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent()
+        }.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        return PendingIntent.getActivity(
             context,
             contest.id,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("🚀 Contest Starting Soon!")
-            .setContentText("${contest.event} on $platformName")
-            .setStyle(NotificationCompat.BigTextStyle()
-                .bigText("${contest.event} on $platformName\nStarts in 20 minutes!"))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .build()
-        
-        if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-            NotificationManagerCompat.from(context).notify(contest.id, notification)
-            android.util.Log.d("NotificationHelper", "✅ Notification sent for: ${contest.event}")
-        } else {
-            android.util.Log.w("NotificationHelper", "⚠️ Notifications are disabled")
-        }
     }
-    
-    fun checkAndNotifyUpcomingContests(contests: List<ContestItem>, platformName: String) {
-        val currentTime = Calendar.getInstance()
-        val twentyMinutesFromNow = Calendar.getInstance().apply {
-            add(Calendar.MINUTE, 20)
-        }
-        
-        // Get shared preferences to track notified contests
-        val prefs = context.getSharedPreferences("contest_notifications", Context.MODE_PRIVATE)
-        
-        contests.forEach { contest ->
-            try {
-                // Try multiple date formats
-                val formats = listOf(
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()),
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()),
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()),
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault())
-                )
-                
-                var contestStart: Date? = null
-                for (format in formats) {
-                    try {
-                        contestStart = format.parse(contest.start)
-                        if (contestStart != null) break
-                    } catch (e: Exception) {
-                        // Try next format
-                    }
-                }
-                
-                contestStart?.let { startTime ->
-                    val contestCalendar = Calendar.getInstance()
-                    contestCalendar.time = startTime
-                    
-                    // Calculate time 20 minutes before contest
-                    val notificationTime = Calendar.getInstance()
-                    notificationTime.time = startTime
-                    notificationTime.add(Calendar.MINUTE, -20)
-                    
-                    val currentTimeInMillis = currentTime.timeInMillis
-                    val notificationTimeInMillis = notificationTime.timeInMillis
-                    val twentyMinutesFromNowInMillis = twentyMinutesFromNow.timeInMillis
-                    
-                    // Check if we should notify now (within the 20-minute window)
-                    val shouldNotifyNow = notificationTimeInMillis <= currentTimeInMillis && 
-                                          currentTimeInMillis <= notificationTimeInMillis + TimeUnit.MINUTES.toMillis(5)
-                    
-                    // Check if contest starts within the next 20 minutes
-                    val contestStartsSoon = contestCalendar.after(currentTime) && 
-                                           contestCalendar.before(twentyMinutesFromNow)
-                    
-                    // Check if we've already notified for this contest
-                    val notificationKey = "notified_${contest.id}_${contest.start}"
-                    val alreadyNotified = prefs.getBoolean(notificationKey, false)
-                    
-                    if ((shouldNotifyNow || contestStartsSoon) && !alreadyNotified) {
-                        showContestReminder(contest, platformName)
-                        // Mark as notified
-                        prefs.edit().putBoolean(notificationKey, true).apply()
-                        android.util.Log.d("NotificationHelper", "📢 Scheduled notification for: ${contest.event} at ${contest.start}")
-                    }
-                } ?: run {
-                    android.util.Log.w("NotificationHelper", "⚠️ Could not parse date: ${contest.start}")
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("NotificationHelper", "❌ Error parsing contest time: ${e.message}", e)
-            }
-        }
+
+    private fun canPostNotifications(): Boolean {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
+
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun notificationId(contest: ContestItem, startMillis: Long?): Int {
+        return listOf(contest.id, startMillis ?: 0L, ContestReminderPolicy.REMINDER_MINUTES).hashCode()
     }
 }

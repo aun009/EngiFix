@@ -18,8 +18,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -114,16 +114,23 @@ fun UserNameAndPassScreen(
                         .filter { it.isLetterOrDigit() || it == '_' || it == '.' }
                         .take(20)
                 },
-                placeholder = { Text("choose_a_handle", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                placeholder = { Text("choose_a_handle", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
                 colors = textFieldColors(),
                 singleLine = true,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
-                    .padding(start = 8.dp, end = 8.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
+                    .padding(horizontal = 8.dp)
             )
 
             Spacer(Modifier.Companion.height(16.dp))
+
+            Text(
+                text = "Password",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                modifier = Modifier.Companion.padding(start = 4.dp, bottom = 4.dp)
+            )
 
             TextField(
                 value = authViewModel.passwordSignUp, // 👈 comes from ViewModel
@@ -131,7 +138,7 @@ fun UserNameAndPassScreen(
                 placeholder = {
                     Text(
                         "Enter your password",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         fontSize = 16.sp
                     )
                 },
@@ -139,21 +146,21 @@ fun UserNameAndPassScreen(
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Close else Icons.Default.Done,
+                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
-                colors = textFieldColors1(),
+                colors = textFieldColors(),
                 singleLine = true,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
                     .background(
-                        MaterialTheme.colorScheme.surface,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = 8.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Companion.Password)
             )
 
@@ -200,11 +207,11 @@ fun UserNameAndPassScreen(
                         Log.d("AuthDebug", "registerUser() callback → ok=$ok err=$err")
 
                         if (ok) {
-                            Log.d("AuthDebug", "Signup success → navigating to login_screen")
+                            Log.d("AuthDebug", "Signup success → navigating to home")
 
-                            navController.navigate("login_screen") {
+                            navController.navigate("home") {
                                 popUpTo("first_screen") {
-                                    inclusive = false
+                                    inclusive = true
                                 }
                             }
                         } else {
@@ -216,6 +223,7 @@ fun UserNameAndPassScreen(
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
+                textColor = MaterialTheme.colorScheme.onPrimary,
                 textFontWeight = FontWeight.Medium
             )
 

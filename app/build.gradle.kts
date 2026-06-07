@@ -38,6 +38,14 @@ android {
             ?: System.getenv("GEMINI_API_KEY")
             ?: ""
         buildConfigField("String", "GEMINI_API_KEY", "\"${geminiApiKey.asBuildConfigString()}\"")
+        val clistApiKey = localProperties.getProperty("CLIST_API_KEY")
+            ?: System.getenv("CLIST_API_KEY")
+            ?: ""
+        buildConfigField("String", "CLIST_API_KEY", "\"${clistApiKey.asBuildConfigString()}\"")
+        val razorpayKeyId = localProperties.getProperty("RAZORPAY_KEY_ID")
+            ?: System.getenv("RAZORPAY_KEY_ID")
+            ?: ""
+        buildConfigField("String", "RAZORPAY_KEY_ID", "\"${razorpayKeyId.asBuildConfigString()}\"")
     }
 
     buildFeatures{
@@ -109,6 +117,7 @@ dependencies {
     // https://mvnrepository.com/artifact/io.coil-kt.coil3/coil-compose
 
 
+    implementation(libs.androidx.navigation.compose)
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")

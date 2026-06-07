@@ -1,5 +1,6 @@
 package com.example.auth.di
 
+import com.example.auth.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,10 +20,17 @@ object NetworkModule {
     @Singleton
     fun provideApiKeyInterceptor(): Interceptor {
         return Interceptor { chain ->
-            val request = chain.request()
-                .newBuilder()
-                .addHeader("Authorization", "ApiKey arun2232:66e40f3b7ace57d0f534e5ed3c42949849241291")
-                .build()
+            val builder = chain.request().newBuilder()
+            if (BuildConfig.CLIST_API_KEY.isNotBlank()) {
+                val apiKey = BuildConfig.CLIST_API_KEY
+                val authHeader = if (apiKey.contains(":")) {
+                    "ApiKey $apiKey"
+                } else {
+                    "ApiKey arun2232:$apiKey"
+                }
+                builder.addHeader("Authorization", authHeader)
+            }
+            val request = builder.build()
             chain.proceed(request)
         }
     }
@@ -31,7 +39,11 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(interceptor: Interceptor): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
         
         return OkHttpClient.Builder()

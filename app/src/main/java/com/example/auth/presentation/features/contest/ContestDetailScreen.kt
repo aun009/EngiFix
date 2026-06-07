@@ -13,26 +13,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContestDetailScreen(
-    contest: ContestItem,
+    contest: ContestUiModel,
     platformColor: Color,
-    platformName: String,
     onBackClick: () -> Unit,
     onOpenContest: () -> Unit
 ) {
-    val context = LocalContext.current
+    val rawContest = contest.raw
     
     Scaffold(
         topBar = {
@@ -66,14 +60,14 @@ fun ContestDetailScreen(
             ) {
                 Column {
                     Text(
-                        text = platformName,
+                        text = contest.platformName,
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = contest.event,
+                        text = rawContest.event,
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
                         fontWeight = FontWeight.Medium
@@ -113,7 +107,7 @@ fun ContestDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = contest.duration,
+                                text = contest.formattedDuration,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -164,7 +158,7 @@ fun ContestDetailScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = formatDetailedDateTime(contest.start),
+                                    text = contest.formattedStartDateTime,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -177,7 +171,7 @@ fun ContestDetailScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = formatDetailedDateTime(contest.end),
+                                    text = contest.formattedEndDateTime,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -214,7 +208,7 @@ fun ContestDetailScreen(
                 
                 // Contest URL
                 Text(
-                    text = contest.href,
+                    text = rawContest.href,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -224,16 +218,5 @@ fun ContestDetailScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
         }
-    }
-}
-
-private fun formatDetailedDateTime(dateTimeString: String): String {
-    return try {
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
-        val outputFormat = SimpleDateFormat("MMM dd, yyyy\nHH:mm", Locale.getDefault())
-        val date = inputFormat.parse(dateTimeString)
-        date?.let { outputFormat.format(it) } ?: dateTimeString
-    } catch (e: Exception) {
-        dateTimeString
     }
 }

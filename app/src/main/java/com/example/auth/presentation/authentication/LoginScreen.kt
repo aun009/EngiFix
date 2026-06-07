@@ -2,36 +2,39 @@ package com.example.auth.presentation.authentication
 
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,14 +49,14 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.auth.presentation.components.ButtonEx
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(navController: NavController,
-                authViewModel: AuthViewModel
+fun LoginScreen(
+    navController: NavController,
+    authViewModel: AuthViewModel
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -69,12 +72,9 @@ fun LoginScreen(navController: NavController,
         Column(
             modifier = Modifier.Companion
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .imePadding()
                 .padding(horizontal = 20.dp)
-
         ) {
-            Spacer(Modifier.Companion.height(26.dp))
+            Spacer(Modifier.Companion.height(40.dp))
 
             // Back arrow icon
             IconButton(
@@ -88,13 +88,13 @@ fun LoginScreen(navController: NavController,
                 )
             }
 
-            Spacer(Modifier.Companion.height(24.dp))
+            Spacer(Modifier.Companion.height(40.dp))
 
             // Title
             Text(
                 text = "Welcome back!",
                 fontWeight = FontWeight.Companion.Bold,
-                fontSize = 29.sp,
+                fontSize = 32.sp,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.Companion.padding(start = 8.dp)
             )
@@ -109,7 +109,7 @@ fun LoginScreen(navController: NavController,
                 modifier = Modifier.Companion.padding(start = 8.dp)
             )
 
-            Spacer(Modifier.Companion.height(24.dp))
+            Spacer(Modifier.Companion.height(32.dp))
 
             // Email or Phone Number field
             Text(
@@ -132,7 +132,7 @@ fun LoginScreen(navController: NavController,
                 placeholder = {
                     Text(
                         "Enter your email or phone",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         fontSize = 16.sp
                     )
                 },
@@ -140,7 +140,7 @@ fun LoginScreen(navController: NavController,
                 singleLine = true,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(12.dp))
                     .padding(horizontal = 4.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Companion.Email)
             )
@@ -153,7 +153,7 @@ fun LoginScreen(navController: NavController,
                 placeholder = {
                     Text(
                         "Enter your password",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         fontSize = 16.sp
                     )
                 },
@@ -161,7 +161,7 @@ fun LoginScreen(navController: NavController,
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Close else Icons.Default.Done,
+                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                             contentDescription = if (passwordVisible) "Hide password" else "Show password",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -172,13 +172,12 @@ fun LoginScreen(navController: NavController,
                 modifier = Modifier.Companion
                     .fillMaxWidth()
                     .background(
-                        MaterialTheme.colorScheme.surface,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp)
                     )
                     .padding(horizontal = 4.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Companion.Password)
             )
-
 
             Spacer(Modifier.Companion.height(16.dp))
 
@@ -197,24 +196,7 @@ fun LoginScreen(navController: NavController,
                     }
             )
 
-            Spacer(Modifier.Companion.height(24.dp))
-
-            // Login Button
-//            Button(
-//                onClick = { /* TODO: Handle Login */ },
-//                modifier = Modifier
-//                    .fillMaxWidth()
-//                    .height(50.dp),
-//                shape = RoundedCornerShape(25.dp),
-//                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5865F2))
-//            ) {
-//                Text(
-//                    "Log In",
-//                    color = Color.White,
-//                    fontSize = 16.sp,
-//                    fontWeight = FontWeight.Medium
-//                )
-//            }
+            Spacer(Modifier.Companion.height(32.dp))
 
             ButtonEx(
                 text = "Log In",
@@ -229,145 +211,119 @@ fun LoginScreen(navController: NavController,
                             Log.e("LoginScreen", "Login error: $err")
                         }
                     }
-
                 },
                 containerColor = MaterialTheme.colorScheme.primary,
+                textColor = MaterialTheme.colorScheme.onPrimary,
                 textFontWeight = FontWeight.Companion.Medium
             )
 
+            Spacer(Modifier.Companion.height(24.dp))
 
+            // Or divider
             Text(
-                text = "Create a new account",
-                color = MaterialTheme.colorScheme.primary,
+                text = "Or",
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Companion.Center,
-                modifier = Modifier.Companion
-                    .fillMaxWidth()
-                    .padding(top = 18.dp, bottom = 24.dp)
-                    .clickable { navController.navigate("register_screen") }
+                modifier = Modifier.Companion.fillMaxWidth()
             )
+
+            Spacer(Modifier.Companion.height(24.dp))
+
+            Spacer(Modifier.Companion.weight(1f))
         }
     }
 
     if (showResetDialog) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("Reset password") },
-            text = {
-                Column {
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Reset password", color = MaterialTheme.colorScheme.onSurface, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Enter your account email and we'll send you a reset link.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                TextField(
+                    value = resetEmail,
+                    onValueChange = { resetEmail = it },
+                    singleLine = true,
+                    placeholder = {
+                        Text("Enter your email", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    },
+                    colors = textFieldColors1(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                )
+                if (resetError != null) {
                     Text(
-                        text = "Enter your account email and we'll send you a reset link.",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = resetError ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
                     )
-                    Spacer(Modifier.height(12.dp))
-                    TextField(
-                        value = resetEmail,
-                        onValueChange = { resetEmail = it },
-                        singleLine = true,
-                        placeholder = {
-                            Text("Enter your email", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { showResetDialog = false },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                    )
-                    if (resetError != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = resetError ?: "",
-                            color = Color(0xFFFF5252),
-                            fontSize = 12.sp
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                         )
+                    ) {
+                        Text("Cancel", fontSize = 16.sp)
                     }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val email = resetEmail.trim()
-                        if (email.isBlank() || !email.contains("@")) {
-                            resetError = "Enter a valid email."
-                            return@TextButton
-                        }
-
-                        authViewModel.sendPasswordResetEmail(email) { ok, err ->
-                            if (ok) {
-                                Toast.makeText(
-                                    context,
-                                    "Password reset email sent. Check your inbox.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                                showResetDialog = false
-                            } else {
-                                resetError = err ?: "Failed to send reset email."
+                    Button(
+                        onClick = {
+                            val email = resetEmail.trim()
+                            if (email.isBlank() || !email.contains("@")) {
+                                resetError = "Enter a valid email."
+                                return@Button
                             }
-                        }
+
+                            authViewModel.sendPasswordResetEmail(email) { ok, err ->
+                                if (ok) {
+                                    Toast.makeText(
+                                        context,
+                                        "Password reset email sent. Check your inbox.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    showResetDialog = false
+                                } else {
+                                    resetError = err ?: "Failed to send reset email."
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text("Send link", fontSize = 16.sp)
                     }
-                ) {
-                    Text("Send link")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
-                    Text("Cancel")
                 }
             }
-        )
+        }
     }
 }
 
 // Reuse the same textFieldColors function from your RegisterScreen
 @Composable
-fun textFieldColors1() = TextFieldDefaults.colors(
-    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-    disabledTextColor = Color.Companion.Gray,
-    errorTextColor = MaterialTheme.colorScheme.error,
-    focusedContainerColor = Color.Companion.Transparent,
-    unfocusedContainerColor = Color.Companion.Transparent,
-    disabledContainerColor = Color.Companion.Transparent,
-    errorContainerColor = Color.Companion.Transparent,
-    cursorColor = MaterialTheme.colorScheme.primary,
-    errorCursorColor = MaterialTheme.colorScheme.error,
-    focusedIndicatorColor = Color.Companion.Transparent,
-    unfocusedIndicatorColor = Color.Companion.Transparent,
-    disabledIndicatorColor = Color.Companion.Transparent,
-    errorIndicatorColor = Color.Companion.Transparent,
-    focusedLeadingIconColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledLeadingIconColor = Color.Companion.Gray,
-    errorLeadingIconColor = MaterialTheme.colorScheme.error,
-    focusedTrailingIconColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledTrailingIconColor = Color.Companion.Gray,
-    errorTrailingIconColor = MaterialTheme.colorScheme.error,
-    focusedLabelColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledLabelColor = Color.Companion.Gray,
-    errorLabelColor = MaterialTheme.colorScheme.error,
-    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledPlaceholderColor = Color.Companion.Gray,
-    errorPlaceholderColor = MaterialTheme.colorScheme.error,
-    focusedSupportingTextColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledSupportingTextColor = Color.Companion.Gray,
-    errorSupportingTextColor = MaterialTheme.colorScheme.error,
-    focusedPrefixColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedPrefixColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledPrefixColor = Color.Companion.Gray,
-    errorPrefixColor = MaterialTheme.colorScheme.error,
-    focusedSuffixColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedSuffixColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    disabledSuffixColor = Color.Companion.Gray,
-    errorSuffixColor = MaterialTheme.colorScheme.error,
-)
+fun textFieldColors1() = textFieldColors()
